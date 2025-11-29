@@ -371,7 +371,7 @@
             const circleSprite = textureLoader.load('https://threejs.org/examples/textures/sprites/disc.png'); 
 
             cometTailMaterial = new THREE.PointsMaterial({
-                size: 4, // 减小彗尾大小
+                size: 2, // 彗尾大小从 4 减小到 2
                 map: circleSprite,
                 vertexColors: true,
                 blending: THREE.AdditiveBlending,
@@ -639,36 +639,39 @@
             if (numHands > 0) {
                 const landmarks = results.multiHandLandmarks[0]; // 始终使用第一只手计算交互因子
                 
-                const thumb = landmarks[4];
                 const index = landmarks[8]; // 食指尖
+                const middle = landmarks[12]; // 中指尖
+                const pinky = landmarks[20]; // 小指尖
 
-                const distance = Math.sqrt(
-                    Math.pow(thumb.x - index.x, 2) + 
-                    Math.pow(thumb.y - index.y, 2)
+                // --- 粒子扩散逻辑: 使用中指尖(12)和小指尖(20)的距离来判断手掌是否张开 ---
+                const spreadDistance = Math.sqrt(
+                    Math.pow(middle.x - pinky.x, 2) + 
+                    Math.pow(middle.y - pinky.y, 2)
                 );
 
-                let factor = (distance - 0.02) * 6; 
+                // 将距离转换为 0 到 1 之间的因子。
+                // 阈值 0.1 以下视为并拢，0.35 以上视为完全张开
+                let factor = (spreadDistance - 0.1) * 4; 
                 factor = Math.max(0, Math.min(1, factor));
 
                 handInteractionFactor += (factor - handInteractionFactor) * 0.1;
                 
                 // --- 彗尾控制逻辑 (仅在检测到一根手时触发) ---
                 if (oneHandDetected && cometTailParticles && cometTailParticles.visible) {
-                    // 将 MediaPipe 的归一化屏幕坐标 (0-1) 转换为 Three.js 世界坐标
-                    tempScreenVector.set(
-                        (index.x * 2) - 1,   // X 从 0-1 映射到 -1到1
-                        -(index.y * 2) + 1,  // Y 从 0-1 映射到 1到-1 (反转)
-                        0.5 // 固定的Z深度
-                    );
-                    tempScreenVector.unproject(camera); 
-
-                    // 增强：距离中心更近，使其更“实时”
-                    const distanceToCometTail = 30; 
-                    const dir = tempScreenVector.sub(camera.position).normalize();
-                    const cometTailWorldPosition = camera.position.clone().add(dir.multiplyScalar(distanceToCometTail));
-
-                    // --- 限制彗尾只在 XY 平面（Z=0）移动 ---
-                    cometTailWorldPosition.z = 0; 
+                    
+                    // 1. 定义一个映射范围，使手部移动能够覆盖场景中心的一个区域
+                    const worldRange = 40; 
+                    
+                    // 2. 计算 X 轴世界坐标：(index.x - 0.5) 得到 -0.5 到 0.5 的偏移
+                    // X 轴：(index.x - 0.5) 得到 -0.5 到 0.5 的偏移，乘以 worldRange 得到最终的 X 位置 (正值向右)
+                    const worldX = (index.x - 0.5) * worldRange; 
+                    
+                    // 3. 计算 Y 轴世界坐标：-(index.y - 0.5) 反转 Y 轴，使手指向上移动 (index.y 减小) 
+                    // 对应世界坐标的 Y 增加 (向上)
+                    const worldY = -(index.y - 0.5) * worldRange; 
+                    
+                    // 4. 设定彗尾的 3D 世界位置 (固定 Z = 0)
+                    const cometTailWorldPosition = new THREE.Vector3(worldX, worldY, 0); 
                     
                     // 更新彗尾粒子位置 (循环覆盖旧粒子，形成拖尾)
                     const ctPositions = cometTailParticles.geometry.attributes.position.array;
