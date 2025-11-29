@@ -67,8 +67,8 @@
     <script type="importmap">
         {
             "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
             }
         }
     </script>
@@ -84,30 +84,31 @@
         // --- 全局变量 ---
         let scene, camera, renderer, particles, geometry, material;
         let controls;
+        let originalAutoRotateSpeed = 1.0; 
+
         const particleCount = 25000;
-        const positions = [];
         const targets = {     // 存储各形状的目标位置
             cubicHeart: [],
             flower: [],
             saturn: [],
             buddha: [],
             fireworks: [],
-            galaxySwirl: [] // 新增：漩涡宇宙
+            galaxySwirl: [] 
         };
-        let currentShape = 'saturn'; // 默认形状仍为土星
+        let currentShape = 'saturn'; 
         let handInteractionFactor = 0;
-        let targetColor = new THREE.Color(0xd7a560); // 默认土星颜色
+        let targetColor = new THREE.Color(0xd7a560); 
         
         let photoMesh;
 
         // --- 彗尾粒子系统变量 ---
         let cometTailParticles, cometTailGeometry, cometTailMaterial;
-        const cometTailParticleCount = 150; // 彗尾粒子数量
+        const cometTailParticleCount = 150; 
         const cometTailPositions = new Float32Array(cometTailParticleCount * 3);
         const cometTailColors = new Float32Array(cometTailParticleCount * 3);
-        let cometTailIndex = 0; // 当前要更新的彗尾粒子索引
+        let cometTailIndex = 0; 
         const cometTailColor = new THREE.Color(0x00ffff); // 彗尾颜色 (青色)
-        const tempScreenVector = new THREE.Vector3(); // 用于屏幕坐标转换
+        const tempScreenVector = new THREE.Vector3(); 
 
         // --- 初始化 Three.js ---
         function initThree() {
@@ -118,8 +119,9 @@
             scene.fog = new THREE.FogExp2(0x000000, 0.002);
 
             camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 2000);
-            camera.position.z = 100;
-            camera.position.y = 20;
+            // 调整：默认相机俯视位置
+            camera.position.set(0, 100, 0); 
+            camera.lookAt(0, 0, 0); // 确保看向中心
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -129,14 +131,16 @@
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.autoRotate = true;
-            controls.autoRotateSpeed = 1.0;
+            controls.autoRotateSpeed = originalAutoRotateSpeed;
+            originalAutoRotateSpeed = controls.autoRotateSpeed; 
+            controls.target.set(0,0,0); // 默认看向中心
 
             loadPhotos();
 
             // 创建粒子系统（主粒子和彗尾粒子）
             generateShapes();
             createParticles();
-            createCometTailParticles(); // 创建彗尾粒子系统
+            createCometTailParticles(); 
             initGUI();
             
             window.addEventListener('resize', onWindowResize);
@@ -156,8 +160,9 @@
         function loadPhotos() {
             const textureLoader = new THREE.TextureLoader();
             
-            const frontTexture = textureLoader.load('1.jpg'); 
-            const backTexture = textureLoader.load('2.jpg');
+            // 使用占位符图片
+            const frontTexture = textureLoader.load('https://placehold.co/1000x1000/362E4F/ffffff?text=Photo+Front'); 
+            const backTexture = textureLoader.load('https://placehold.co/1000x1000/2E364F/ffffff?text=Photo+Back');
 
             const photoGeometry = new THREE.PlaneGeometry(30, 30);
 
@@ -194,7 +199,7 @@
             const photoOffsetZ = 0;
 
             for (let i = 0; i < particleCount; i++) {
-                // 1. 立方体爱心 (Cubic Heart)
+                // 1. 立方体爱心 
                 let x, y, z, t;
                 t = Math.random() * Math.PI * 2;
                 
@@ -209,7 +214,7 @@
                 targets.cubicHeart.push(x * scale + photoOffsetX, y * scale + photoOffsetY, z + photoOffsetZ);
 
 
-                // 2. 花朵 (Flower / Rose Curve)
+                // 2. 花朵 
                 const f_theta = Math.random() * Math.PI * 2;
                 const f_phi = Math.random() * Math.PI;
                 const k = 3; 
@@ -217,7 +222,7 @@
                 tempVec.setFromSphericalCoords(radius_f, f_phi, f_theta);
                 targets.flower.push(tempVec.x + photoOffsetX, tempVec.y + photoOffsetY, tempVec.z + photoOffsetZ);
 
-                // 3. 土星 (Saturn)
+                // 3. 土星 
                 if (i < particleCount * 0.6) {
                     const phi = Math.acos(-1 + (2 * i) / (particleCount * 0.6));
                     const theta = Math.sqrt((particleCount * 0.6) * Math.PI) * phi;
@@ -230,7 +235,7 @@
                     targets.saturn.push(Math.cos(angle) * dist + photoOffsetX, (Math.random()-0.5)*2 + photoOffsetY, Math.sin(angle) * dist + photoOffsetZ);
                 }
 
-                // 4. 佛像意象 (Buddha Silhouette - Simplified)
+                // 4. 佛像意象 
                 if (i < particleCount * 0.15) {
                     const r = 8;
                     tempVec.randomDirection().multiplyScalar(r).add(new THREE.Vector3(0, 18, 0));
@@ -248,20 +253,31 @@
                     targets.buddha.push(Math.cos(angle)*r + photoOffsetX, -8 + Math.random()*5 + photoOffsetY, Math.sin(angle)*r * 0.8 + photoOffsetZ);
                 }
 
-                // 5. 烟花 (Fireworks - Random explosion)
+                // 5. 烟花 
                 tempVec.randomDirection().multiplyScalar(50 + Math.random() * 100);
                 targets.fireworks.push(tempVec.x + photoOffsetX, tempVec.y + photoOffsetY, tempVec.z + photoOffsetZ);
 
-                // 6. 漩涡宇宙 (Galaxy Swirl) - 新增
-                const radius = 20 + Math.random() * 30; // 螺旋半径
-                const angle = i * 0.1 + Math.random() * Math.PI * 2; // 角度，i*0.1 形成螺旋
-                const swirlFactor = 0.5; // 漩涡紧密程度
-                
-                x = radius * Math.cos(angle * swirlFactor) * (1 + Math.random() * 0.2);
-                y = (Math.random() - 0.5) * 10; // Y轴上的随机起伏
-                z = radius * Math.sin(angle * swirlFactor) * (1 + Math.random() * 0.2);
+                // 6. 漩涡宇宙 (Galaxy Swirl) - 增强立体感和层次感
+                const maxRadius = 50;
+                const minRadius = 5;
+                const centerDensityFactor = 0.5; // 中心区域更密集
 
-                targets.galaxySwirl.push(x + photoOffsetX, y + photoOffsetY, z + photoOffsetZ);
+                // 使用一个非线性分布来生成半径，让中心更密集
+                let radius = Math.sqrt(Math.random()) * (maxRadius - minRadius) + minRadius; 
+                
+                // 角度从中心向外螺旋
+                const spiralTurns = 5; // 螺旋圈数
+                const angle = (radius / maxRadius) * spiralTurns * Math.PI * 2 + Math.random() * 0.5; // 加上少量随机性
+
+                // Y轴（Z轴在俯视时）偏移，模拟星系盘面厚度
+                let y_offset = (Math.random() - 0.5) * 10; // 基础随机起伏
+                // 离中心越近，Y轴偏移越小，模拟中心凸起
+                y_offset *= (radius / maxRadius) * 0.8 + 0.2; // 中心更薄，边缘更厚
+
+                x = radius * Math.cos(angle);
+                z = radius * Math.sin(angle); // 注意：这里将螺旋放在XZ平面
+
+                targets.galaxySwirl.push(x + photoOffsetX, y_offset + photoOffsetY, z + photoOffsetZ);
             }
         }
 
@@ -299,10 +315,9 @@
         function createCometTailParticles() {
             cometTailGeometry = new THREE.BufferGeometry();
             
-            // 初始化彗尾粒子的位置和颜色
             for (let i = 0; i < cometTailParticleCount * 3; i++) {
-                cometTailPositions[i] = 0; // 初始都在原点
-                cometTailColors[i] = cometTailColor.r; // 初始化为彗尾颜色
+                cometTailPositions[i] = 0; 
+                cometTailColors[i] = cometTailColor.r; 
             }
             cometTailGeometry.setAttribute('position', new THREE.BufferAttribute(cometTailPositions, 3));
             cometTailGeometry.setAttribute('color', new THREE.BufferAttribute(cometTailColors, 3));
@@ -311,13 +326,13 @@
             const circleSprite = textureLoader.load('https://threejs.org/examples/textures/sprites/disc.png'); 
 
             cometTailMaterial = new THREE.PointsMaterial({
-                size: 3, // 彗尾粒子稍微大一些
+                size: 8, 
                 map: circleSprite,
                 vertexColors: true,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
                 transparent: true,
-                opacity: 0.5 // 彗尾粒子可以稍微透明一些
+                opacity: 1.0 
             });
 
             cometTailParticles = new THREE.Points(cometTailGeometry, cometTailMaterial);
@@ -333,7 +348,7 @@
                 color: '#d7a560',    
                 particleSize: 1.5,
                 photoRotationSpeed: 0.005,
-                cometTailVisible: true, // 新增：控制彗尾可见性
+                cometTailVisible: true,
                 resetCamera: () => controls.reset()
             };
             
@@ -349,13 +364,32 @@
 
             gui.add(params, 'shape', ['saturn', 'cubicHeart', 'flower', 'buddha', 'fireworks', 'galaxySwirl']).name('模型选择').onChange(val => {
                 currentShape = val;
+                const isGalaxySwirl = val === 'galaxySwirl';
+                
+                // --- 视角控制逻辑 (增强固定效果) ---
+                if (isGalaxySwirl) {
+                    controls.autoRotate = false;
+                    controls.enabled = false; // 禁用鼠标/触摸控制
+                    
+                    // 强制设置一个俯视固定视角，看向中心
+                    camera.position.set(0, 100, 0); // 从Y轴上方看
+                    controls.target.set(0, 0, 0); // 看向场景中心
+                    controls.update(); 
+
+                } else {
+                    controls.autoRotate = true; 
+                    controls.enabled = true;    // 启用鼠标/触摸控制
+                    controls.autoRotateSpeed = originalAutoRotateSpeed;
+                    controls.reset(); // 切换回可旋转模式时重置视角
+                }
+                
                 // 切换颜色主题
                 if(val === 'saturn') params.color = '#d7a560';
                 if(val === 'cubicHeart') params.color = '#ff69b4';
                 if(val === 'flower') params.color = '#ffcc00';
                 if(val === 'buddha') params.color = '#00ffff';
                 if(val === 'fireworks') params.color = '#ffffff';
-                if(val === 'galaxySwirl') params.color = '#e0b0ff'; // 漩涡宇宙默认颜色 (Lavender)
+                if(val === 'galaxySwirl') params.color = '#e0b0ff';
                 targetColor.set(params.color);
             });
 
@@ -374,7 +408,6 @@
                 photoMesh.rotationSpeed = params.photoRotationSpeed;
             }
 
-            // 新增彗尾可见性控制
             gui.add(params, 'cometTailVisible').name('彗尾可见').onChange(val => {
                 if (cometTailParticles) {
                     cometTailParticles.visible = val;
@@ -388,7 +421,10 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            controls.update();
+            // 只有在非固定视角模式下才更新 OrbitControls
+            if (controls.enabled) {
+                controls.update();
+            }
 
             const positions = particles.geometry.attributes.position.array;
             const targetArr = targets[currentShape];
@@ -399,6 +435,7 @@
             const isFireworks = currentShape === 'fireworks';
             const speed = isFireworks ? 0.02 : 0.05;
 
+            // 主粒子更新
             for (let i = 0; i < particleCount; i++) {
                 const ix = i * 3;
                 const iy = i * 3 + 1;
@@ -426,15 +463,23 @@
             particles.geometry.attributes.position.needsUpdate = true;
             particles.geometry.attributes.color.needsUpdate = true;
             
-            // 更新彗尾粒子透明度，实现拖尾消失效果
-            const ctColors = cometTailParticles.geometry.attributes.color.array;
-            for (let i = 0; i < cometTailParticleCount; i++) {
-                const alpha = Math.max(0, 1 - (i / cometTailParticleCount)); // 越旧的粒子越透明
-                ctColors[i * 3 + 0] = cometTailColor.r * alpha;
-                ctColors[i * 3 + 1] = cometTailColor.g * alpha;
-                ctColors[i * 3 + 2] = cometTailColor.b * alpha;
+            // --- 彗尾粒子衰减更新 ---
+            if (cometTailParticles && cometTailParticles.visible) {
+                const ctColors = cometTailParticles.geometry.attributes.color.array;
+                let headIndex = (cometTailIndex === 0) ? cometTailParticleCount - 1 : cometTailIndex - 1;
+
+                for (let i = 0; i < cometTailParticleCount; i++) {
+                    let distance = (headIndex - i + cometTailParticleCount) % cometTailParticleCount;
+                    let normalizedDistance = distance / cometTailParticleCount; 
+                    
+                    const alpha = Math.pow(Math.max(0, 1 - normalizedDistance), 6); 
+                    
+                    ctColors[i * 3 + 0] = cometTailColor.r * alpha;
+                    ctColors[i * 3 + 1] = cometTailColor.g * alpha;
+                    ctColors[i * 3 + 2] = cometTailColor.b * alpha;
+                }
+                cometTailParticles.geometry.attributes.color.needsUpdate = true;
             }
-            cometTailParticles.geometry.attributes.color.needsUpdate = true;
 
 
             // 照片旋转
@@ -476,19 +521,15 @@
                 // --- 彗尾控制逻辑 ---
                 if (cometTailParticles && cometTailParticles.visible) {
                     // 将 MediaPipe 的归一化屏幕坐标 (0-1) 转换为 Three.js 世界坐标
-                    // MediaPipe 的 Y 轴方向与 Three.js 的通常屏幕坐标 Y 轴相反，需要反转
-                    // 假设 Z 轴深度在一个固定距离，例如距离相机-20单位
                     tempScreenVector.set(
                         (index.x * 2) - 1,   // X 从 0-1 映射到 -1到1
                         -(index.y * 2) + 1,  // Y 从 0-1 映射到 1到-1 (反转)
-                        0.5 // 固定的Z深度，可以调整，0.5是一个常见的中间值
+                        0.5 // 固定的Z深度
                     );
-                    tempScreenVector.unproject(camera); // 将屏幕坐标转换为世界坐标
+                    tempScreenVector.unproject(camera); 
 
-                    // 计算相机到这个世界坐标点的向量
+                    const distanceToCometTail = 30; 
                     const dir = tempScreenVector.sub(camera.position).normalize();
-                    // 在相机前方某个距离上放置彗尾
-                    const distanceToCometTail = 50; // 彗尾距离相机多远，可以调整
                     const cometTailWorldPosition = camera.position.clone().add(dir.multiplyScalar(distanceToCometTail));
 
 
@@ -534,5 +575,3 @@
     </script>
 </body>
 </html>
-
-http://googleusercontent.com/immersive_entry_chip/0
