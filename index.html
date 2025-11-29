@@ -140,6 +140,17 @@
             generateShapes();
             createParticles();
             createCometTailParticles(); 
+            
+            // =======================================================
+            // 关键改动：将彗尾粒子附加到 photoMesh (包含土星模型和粒子)
+            // 这样彗尾就会随着 photoMesh 的旋转而旋转
+            // =======================================================
+            if (photoMesh) {
+                photoMesh.add(cometTailParticles); 
+            } else {
+                scene.add(cometTailParticles); // 备用
+            }
+            
             initGUI();
             
             window.addEventListener('resize', onWindowResize);
@@ -253,7 +264,8 @@
 
                     // 定义各组环的半径和特征
                     const baseRadius = 45;
-                    const groupSpacing = 4.5; // 环带之间的间距
+                    // ** 环带之间的间距设置为 10.0 **
+                    const groupSpacing = 10.0; 
                     
                     let groupIndex = Math.floor(particleIndexInRing / groupSize);
 
@@ -289,7 +301,7 @@
                     // 特殊小卫星 (Outer Satellite) - 保留
                     const angle = Math.random() * Math.PI * 2;
                     // 设置一个更大的轨道半径，使其位于主星环外部
-                    const dist = 75 + Math.random() * 5; 
+                    const dist = 90 + Math.random() * 10; // 调整最外层卫星轨道半径以匹配更大的星环
                     const y_offset = (Math.random() - 0.5) * 8; // 增加厚度
                     targets.saturn.push(
                         Math.cos(angle) * dist + photoOffsetX, 
@@ -379,7 +391,7 @@
             });
 
             cometTailParticles = new THREE.Points(cometTailGeometry, cometTailMaterial);
-            scene.add(cometTailParticles);
+            // 彗尾粒子现在只会在 initThree() 中被添加到 photoMesh
         }
 
 
@@ -688,6 +700,7 @@
                     const worldY = -(index.y - 0.5) * worldRange; 
                     
                     // 4. 设定彗尾的 3D 世界位置 (固定 Z = 0)
+                    // 由于 cometTailParticles 现在是 photoMesh 的子对象，这个位置是相对于 photoMesh 的本地坐标。
                     const cometTailWorldPosition = new THREE.Vector3(worldX, worldY, 0); 
                     
                     // 更新彗尾粒子位置 (循环覆盖旧粒子，形成拖尾)
