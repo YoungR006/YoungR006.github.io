@@ -660,7 +660,8 @@
                 if (oneHandDetected && cometTailParticles && cometTailParticles.visible) {
                     
                     // 1. 定义一个映射范围，使手部移动能够覆盖场景中心的一个区域
-                    const worldRange = 40; 
+                    // 范围从 40 扩大到 160，覆盖到土星最外环 (~80)
+                    const worldRange = 160; 
                     
                     // 2. 计算 X 轴世界坐标：(index.x - 0.5) 得到 -0.5 到 0.5 的偏移
                     // X 轴：(index.x - 0.5) 得到 -0.5 到 0.5 的偏移，乘以 worldRange 得到最终的 X 位置 (正值向右)
