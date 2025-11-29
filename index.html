@@ -320,8 +320,6 @@
                 // 增加爆炸范围
                 tempVec.randomDirection().multiplyScalar(50 + Math.random() * 150);
                 targets.fireworks.push(tempVec.x + photoOffsetX, tempVec.y + photoOffsetY, tempVec.z + photoOffsetZ);
-
-                // 6. 漩涡宇宙 (Galaxy Swirl) - 已删除此模型的生成逻辑
             }
         }
 
@@ -394,7 +392,14 @@
                 particleSize: 1.2, 
                 photoRotationSpeed: 0.005,
                 cometTailVisible: true,
-                resetCamera: () => controls.reset()
+                // 重置相机功能的实现
+                resetCamera: () => {
+                    camera.position.set(0, 20, 100);
+                    camera.fov = 55;
+                    camera.updateProjectionMatrix();
+                    controls.target.set(0, 0, 0); // 将 OrbitControls 的目标点也重置到原点
+                    controls.update();
+                }
             };
             
             const guiDomElement = gui.domElement;
@@ -407,8 +412,22 @@
                 event.stopPropagation();
             }, false);
 
-            // 移除 'galaxySwirl' 选项
-            gui.add(params, 'shape', ['saturn', 'cubicHeart', 'flower', 'buddha', 'fireworks']).name('模型选择').onChange(val => {
+            // --- 相机设置 (新增) ---
+            const cameraFolder = gui.addFolder('相机设置 (Camera)');
+            cameraFolder.add(camera.position, 'x', -500, 500, 1).name('位置 X (Pos X)');
+            cameraFolder.add(camera.position, 'y', -500, 500, 1).name('位置 Y (Pos Y)');
+            cameraFolder.add(camera.position, 'z', -500, 500, 1).name('位置 Z (Pos Z)');
+            cameraFolder.add(camera, 'fov', 10, 100, 1).name('视野 (FOV)').onChange(() => {
+                camera.updateProjectionMatrix();
+            });
+            cameraFolder.add(params, 'resetCamera').name('重置视角 (Reset)');
+            cameraFolder.open(); // 默认打开方便调试
+
+
+            // --- 模型与粒子设置 (原有) ---
+            const particleFolder = gui.addFolder('模型与粒子设置 (Particles)');
+
+            particleFolder.add(params, 'shape', ['saturn', 'cubicHeart', 'flower', 'buddha', 'fireworks']).name('模型选择').onChange(val => {
                 currentShape = val;
 
                 // --- 切换模式时刷新彗尾位置 ---
@@ -418,9 +437,8 @@
                     cometTailParticles.geometry.attributes.position.needsUpdate = true;
                 }
                 
-                // 由于删除了'galaxySwirl'，所有模式都应允许自由旋转
                 controls.autoRotate = true; 
-                controls.enabled = true;    // 启用鼠标/触摸控制
+                controls.enabled = true;    
                 controls.autoRotateSpeed = originalAutoRotateSpeed;
                 
                 // 切换颜色主题
@@ -432,28 +450,26 @@
                 targetColor.set(params.color);
             });
 
-            gui.addColor(params, 'color').name('粒子颜色').onChange(val => {
+            particleFolder.addColor(params, 'color').name('粒子颜色').onChange(val => {
                 targetColor.set(val);
             });
             
-            gui.add(params, 'particleSize', 0.5, 5).name('粒子大小').onChange(val => {
+            particleFolder.add(params, 'particleSize', 0.5, 5).name('粒子大小').onChange(val => {
                 material.size = val;
             });
 
             if (photoMesh) {
-                gui.add(params, 'photoRotationSpeed', 0, 0.05).name('照片旋转速度').onChange(val => {
+                particleFolder.add(params, 'photoRotationSpeed', 0, 0.05).name('照片旋转速度').onChange(val => {
                     photoMesh.rotationSpeed = val;
                 });
                 photoMesh.rotationSpeed = params.photoRotationSpeed;
             }
 
-            gui.add(params, 'cometTailVisible').name('彗尾可见').onChange(val => {
+            particleFolder.add(params, 'cometTailVisible').name('彗尾可见').onChange(val => {
                 if (cometTailParticles) {
                     cometTailParticles.visible = val;
                 }
             });
-
-            gui.add(params, 'resetCamera').name('重置视角');
         }
 
         // --- 动画循环 ---
