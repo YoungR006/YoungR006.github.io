@@ -140,6 +140,8 @@
         let controls;
         let originalAutoRotateSpeed = 1.0; 
         let time = 0; 
+        
+        const DEFAULT_FOV = 55; // 默认的视野范围
 
         // 粒子总数 40000
         const particleCount = 40000; 
@@ -225,7 +227,7 @@
             pointLight.position.set(50, 50, 50);
             scene.add(pointLight);
 
-            camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 2000);
+            camera = new THREE.PerspectiveCamera(DEFAULT_FOV, window.innerWidth / window.innerHeight, 1, 2000);
             camera.position.z = 100;
             camera.position.y = 20;
 
@@ -234,14 +236,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             container.appendChild(renderer.domElement);
 
-            // 移除 OrbitControls 依赖，以防止与 MediapPipe 交互冲突
-            // controls = new OrbitControls(camera, renderer.domElement);
-            // controls.enableDamping = true;
-            // controls.autoRotate = true;
-            // controls.autoRotateSpeed = originalAutoRotateSpeed;
-            // originalAutoRotateSpeed = controls.autoRotateSpeed; 
-
-            // 重新添加 OrbitControls，但默认禁用，仅用于相机控制
+            // OrbitControls 用于相机控制
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.autoRotate = true; // 默认自动旋转
@@ -285,8 +280,10 @@
             const btn = document.getElementById('back-btn');
             btn.classList.remove('visible');
             
-            // 恢复相机自动旋转
+            // 恢复相机自动旋转和 FOV
             controls.autoRotate = true;
+            camera.fov = DEFAULT_FOV; // 恢复默认 FOV
+            camera.updateProjectionMatrix(); 
             
             // 隐藏流星系统
             if (meteorParticles) meteorParticles.visible = false;
@@ -336,6 +333,7 @@
                 for(let x=0; x<canvas.width; x+=2) {
                     const index = (y * canvas.width + x) * 4;
                     if(data[index] > 128) { 
+                        // 将文字世界坐标放大 0.5 倍
                         points.push((x - canvas.width/2) * 0.5, (canvas.height/2 - y) * 0.5, 0);
                     }
                 }
@@ -606,7 +604,7 @@
                 particleSize: 1.1, // 默认值 1.1
                 resetCamera: () => {
                     camera.position.set(0, 20, 100); 
-                    camera.fov = 55;
+                    camera.fov = DEFAULT_FOV;
                     camera.updateProjectionMatrix(); 
                     controls.target.set(0, 0, 0); 
                     controls.update();
@@ -715,16 +713,11 @@
                     // 确保在退出聚焦模式时隐藏流星
                     if(meteorParticles && meteorParticles.visible) meteorParticles.visible = false; 
 
-                    // 计算彗尾到中心的距离 (XY平面投影)
-                    // 彗尾位置 handWorldPosition 已经由 MediaPipe 映射到世界坐标
-                    const dist = Math.sqrt(cometTailWorldPosition.x * cometTailWorldPosition.x + cometTailWorldPosition.y * cometTailWorldPosition.y);
-                    
-                    // 映射距离到环的索引 (近似范围) - Saturn环在 XZ平面，所以我们主要关注 XZ 距离，但由于手势在 XY 平面，这里用 XY 距离来简化交互检测
-                    // 调整：使用XZ平面距离，因为土星环是平面的，并且让交互发生在环的上方
+                    // 计算彗尾到中心的距离 (使用XZ平面距离，因为土星环在XZ平面)
                     const distXZ = Math.sqrt(cometTailWorldPosition.x * cometTailWorldPosition.x + cometTailWorldPosition.z * cometTailWorldPosition.z);
 
                     let hoveredRing = -1;
-                    // 环半径大致为 45, 55, 65, 75, 85 左右 (根据 generateShapes 中的 baseRadius + groupSpacing)
+                    // 环半径大致为 45, 55, 65, 75, 85 左右 
                     if (distXZ > 40 && distXZ < 52) hoveredRing = 0;
                     else if (distXZ >= 52 && distXZ < 62) hoveredRing = 1;
                     else if (distXZ >= 62 && distXZ < 72) hoveredRing = 2;
@@ -739,17 +732,14 @@
                                 interactionState = STATE.FOCUSED;
                                 controls.autoRotate = false; // 停止自动旋转方便查看
                                 
-                                // 旋转到环的正面，方便看文字
+                                // --- 视角拉宽调整开始 ---
                                 camera.position.set(0, 0, 100); 
+                                camera.fov = 80; // 增大 FOV 到 80 度以看全文字
+                                camera.updateProjectionProjectionMatrix(); 
                                 controls.target.set(0, 0, 0); 
                                 controls.update();
+                                // --- 视角拉宽调整结束 ---
 
-                                //camera.position.set(0, 0, 100); 
-                               // camera.fov = 80; // 增大 FOV 到 80 度以看全文字
-                                //camera.updateProjectionProjectionMatrix(); 
-                                //controls.target.set(0, 0, 0); 
-                               // controls.update();
-                                
                                 // 显示交互提示
                                 hintEl.innerText = "手掌聚拢: 聚字 | 手掌张开: 粒子散开 (流星)";
                                 hintEl.style.opacity = 1;
@@ -815,47 +805,7 @@
                 const closureThreshold = 0.3; // 手掌聚拢阈值 (成字)
                 const openThreshold = 0.7;    // 手掌张开阈值 (散开)
 
-                if (handInteractionFactor < closureThreshold) {//没有目标
-                      controls.autoRotate = true;
-                      camera.fov =120;
-                    camera.updateProjectionProjectionMatrix(); 
-                   // ** 1. 手掌聚拢 (低因子) -> 聚集成字 (情话) **
-                    currentTargetArr = targets.ringTexts[activeRingIndex];
-                    targetOpacity = 1.0; // 成字时清晰度最高
-                    
-                    // 隐藏流星系统
-                    if(meteorParticles) meteorParticles.visible = false;
-                    
-                    // 提示文字
-                    hintEl.innerText = loveWords[activeRingIndex];
-                    hintEl.style.opacity = 1;
-                    
-                    // 自动隐藏提示
-                    if (Date.now() - hoverStartTime > 4000) { // 延迟4秒后开始隐藏
-                         if(hintEl.style.opacity > 0) hintEl.style.opacity -= 0.01;
-                    }
-                } 
-                else if (handInteractionFactor >= openThreshold) 
-                {
-                    // ** 2. 手掌张开 (高因子) -> 散开流星 **
-                    currentTargetArr = targets.fireworks; // 复用 fireworks 散射目标
-                    targetOpacity = 0.7; // 散开时稍微透明
-                    
-                    // 激活背景流星系统
-                    if(meteorParticles) meteorParticles.visible = true;
-                    
-                    // 提示文字
-                    hintEl.innerText = "⭐ 散作流星 ⭐";
-                    hintEl.style.opacity = 1;
-
-                } 
-                else {
-                   
-
-
-                     controls.autoRotate = false;
-                      camera.fov = 120;
-                    camera.updateProjectionProjectionMatrix(); 
+                if (handInteractionFactor < closureThreshold) {
                     // ** 1. 手掌聚拢 (低因子) -> 聚集成字 (情话) **
                     currentTargetArr = targets.ringTexts[activeRingIndex];
                     targetOpacity = 1.0; // 成字时清晰度最高
@@ -871,6 +821,34 @@
                     if (Date.now() - hoverStartTime > 4000) { // 延迟4秒后开始隐藏
                          if(hintEl.style.opacity > 0) hintEl.style.opacity -= 0.01;
                     }
+
+                } else if (handInteractionFactor >= openThreshold) {
+                    // ** 2. 手掌张开 (高因子) -> 散开流星 **
+                    currentTargetArr = targets.fireworks; // 复用 fireworks 散射目标
+                    targetOpacity = 0.7; // 散开时稍微透明
+                    
+                    // 激活背景流星系统
+                    if(meteorParticles) meteorParticles.visible = true;
+                    
+                    // 提示文字
+                    hintEl.innerText = "⭐ 散作流星 ⭐";
+                    hintEl.style.opacity = 1;
+
+                } else {
+                    // ** 1. 手掌聚拢 (低因子) -> 聚集成字 (情话) **
+                    currentTargetArr = targets.ringTexts[activeRingIndex];
+                    targetOpacity = 1.0; // 成字时清晰度最高
+                    
+                    // 隐藏流星系统
+                    if(meteorParticles) meteorParticles.visible = false;
+                    
+                    // 提示文字
+                    hintEl.innerText = loveWords[activeRingIndex];
+                    hintEl.style.opacity = 1;
+                    
+                    // 自动隐藏提示
+                    if (Date.now() - hoverStartTime > 4000) { // 延迟4秒后开始隐藏
+                         if(hintEl.style.opacity > 0) hintEl.style.opacity -= 0.01;
                 }
                 
                 currentTargetColor = new THREE.Color(ringColors[activeRingIndex]); // 使用环对应的颜色
@@ -1065,8 +1043,3 @@
     </script>
 </body>
 </html>
-
-
-
-
-
