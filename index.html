@@ -141,15 +141,8 @@
             createParticles();
             createCometTailParticles(); 
             
-            // =======================================================
-            // 关键改动：将彗尾粒子附加到 photoMesh (包含土星模型和粒子)
-            // 这样彗尾就会随着 photoMesh 的旋转而旋转
-            // =======================================================
-            if (photoMesh) {
-                photoMesh.add(cometTailParticles); 
-            } else {
-                scene.add(cometTailParticles); // 备用
-            }
+            // 将彗尾粒子添加到场景 (Scene) 中，使其不随模型旋转
+            scene.add(cometTailParticles); 
             
             initGUI();
             
@@ -170,9 +163,12 @@
         function loadPhotos() {
             const textureLoader = new THREE.TextureLoader();
             
-            // 使用占位符图片
-            const frontTexture = textureLoader.load('https://placehold.co/1000x1000/362E4F/ffffff?text=Photo+Front'); 
-            const backTexture = textureLoader.load('https://placehold.co/1000x1000/2E364F/ffffff?text=Photo+Back');
+            // =======================================================
+            // !!! 替换照片路径的位置 !!!
+            // =======================================================
+            // 使用占位符图片。请将 'https://placehold.co/...' 替换为您自己的图片 URL。
+            const frontTexture = textureLoader.load('https://placehold.co/1000x1000/362E4F/ffffff?text=Photo+Front'); // <-- 照片正面纹理
+            const backTexture = textureLoader.load('https://placehold.co/1000x1000/2E364F/ffffff?text=Photo+Back');   // <-- 照片背面纹理
 
             const photoGeometry = new THREE.PlaneGeometry(30, 30);
 
@@ -264,7 +260,7 @@
 
                     // 定义各组环的半径和特征
                     const baseRadius = 45;
-                    // ** 环带之间的间距设置为 10.0 **
+                    // 环带之间的间距
                     const groupSpacing = 10.0; 
                     
                     let groupIndex = Math.floor(particleIndexInRing / groupSize);
@@ -391,7 +387,7 @@
             });
 
             cometTailParticles = new THREE.Points(cometTailGeometry, cometTailMaterial);
-            // 彗尾粒子现在只会在 initThree() 中被添加到 photoMesh
+            // 彗尾粒子现在只会在 initThree() 中被添加到 scene
         }
 
 
@@ -700,7 +696,7 @@
                     const worldY = -(index.y - 0.5) * worldRange; 
                     
                     // 4. 设定彗尾的 3D 世界位置 (固定 Z = 0)
-                    // 由于 cometTailParticles 现在是 photoMesh 的子对象，这个位置是相对于 photoMesh 的本地坐标。
+                    // 由于 cometTailParticles 现在是 scene 的子对象，这个位置是相对于世界原点的。
                     const cometTailWorldPosition = new THREE.Vector3(worldX, worldY, 0); 
                     
                     // 更新彗尾粒子位置 (循环覆盖旧粒子，形成拖尾)
