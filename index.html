@@ -156,6 +156,7 @@
         
         let currentShape = 'saturn'; 
         let handInteractionFactor = 0; // 0 (Closed) -> 1 (Open)
+        let prevHandInteractionFactor = 0; // 上一帧的手势因子，用于防抖
         let targetColor = new THREE.Color(0xd7a560); 
         let baseOpacity = 0.76; // 基础透明度
         
@@ -225,6 +226,7 @@
             createParticles();
             createCometTailParticles(); 
             
+            // 确保彗尾独立于模型，添加到 Scene 中
             scene.add(cometTailParticles); 
             
             initGUI();
@@ -562,16 +564,22 @@
 
                 // 2. FOCUSED 模式：检测移动重置 + 手势交互
                 else if (interactionState === STATE.FOCUSED) {
+                    // ** 解决冲突：检测手势是否正在大幅变化 **
+                    // 如果手势变化幅度大 (正在张开/闭合)，则认为用户在交互，暂时忽略微小的手指位移
+                    const isGesturing = Math.abs(handInteractionFactor - prevHandInteractionFactor) > 0.01;
+                    
                     // 检测彗尾移动速度
                     const movement = cometTailWorldPosition.distanceTo(lastCometPos);
-                    if (movement > MOVEMENT_SENSITIVITY) {
+                    
+                    // 只有在非激烈手势交互时，才检测移动退出
+                    if (!isGesturing && movement > MOVEMENT_SENSITIVITY) {
                         if (movementStartTime === 0) movementStartTime = Date.now();
                         else if (Date.now() - movementStartTime > RESET_THRESHOLD * 1000) {
                             // 移动太久，重置回土星
                             resetToUniverse();
                         }
                     } else {
-                        movementStartTime = 0; // 停止移动，重置移动计时
+                        movementStartTime = 0; // 停止移动或正在交互，重置移动计时
                     }
                 }
             } else {
@@ -579,6 +587,7 @@
             }
             
             lastCometPos.copy(cometTailWorldPosition);
+            prevHandInteractionFactor = handInteractionFactor; // 更新上一帧因子
 
             // --- 粒子目标位置确定 ---
             const positions = particles.geometry.attributes.position.array;
@@ -587,6 +596,7 @@
             let currentTargetArr;
             let currentTargetColor = targetColor;
             let targetOpacity = baseOpacity; // 目标透明度
+            let shrinkScale = 1.0; // 缩放因子
 
             // 根据状态选择目标形状
             if (interactionState === STATE.FOCUSED && activeRingIndex !== -1) {
@@ -595,13 +605,19 @@
                     // ** 手掌张开 -> 情话 (文字) **
                     currentTargetArr = targets.ringTexts[activeRingIndex];
                     targetOpacity = 1.0; // 文字完全不透明
+                    shrinkScale = 1.0;
                 } else {
                     // ** 手掌聚拢 (或默认) -> 照片 **
                     currentTargetArr = targets.ringPhotos[activeRingIndex];
-                    // 褪色逻辑：聚拢时(handInteractionFactor小)透明度趋向于0
-                    // 为了让聚拢过程可见，我们使用一个较慢的插值或让它在完全聚拢后才非常淡
-                    // 这里设置为：手越紧(factor越小)，透明度越低，直到完全消失
-                    targetOpacity = Math.max(0, handInteractionFactor * 2 - 0.2); 
+                    
+                    // 3. 汇聚消散效果：
+                    // Factor 从 0.6 -> 0 (闭合)。
+                    // 映射 factor 到 0~1 的进度 (closedProgress: 1 means fully closed)
+                    // 当完全闭合时，Opacity -> 0, Scale -> 0
+                    const fadeProgress = Math.max(0, handInteractionFactor / 0.6); // 0 (closed) to 1 (near trigger)
+                    
+                    targetOpacity = fadeProgress; // 越闭合越透明
+                    shrinkScale = 0.1 + 0.9 * fadeProgress; // 越闭合越向中心收缩
                 }
                 currentTargetColor = new THREE.Color(ringColors[activeRingIndex]); // 使用环对应的颜色
             } else {
@@ -639,6 +655,13 @@
                 let tx = currentTargetArr[ix];
                 let ty = currentTargetArr[ix+1];
                 let tz = currentTargetArr[ix+2];
+
+                // 3. 应用收缩缩放 (仅在照片模式下生效)
+                if (interactionState === STATE.FOCUSED && shrinkScale < 0.99) {
+                    tx *= shrinkScale;
+                    ty *= shrinkScale;
+                    tz *= shrinkScale;
+                }
 
                 // 旋转逻辑 (仅在非聚焦模式下旋转，聚焦时文字需要正对)
                 if (interactionState !== STATE.FOCUSED) {
