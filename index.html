@@ -835,20 +835,18 @@
                     hintEl.style.opacity = 1;
 
                 } else {
-                    // ** 1. 手掌聚拢 (低因子) -> 聚集成字 (情话) **
-                    currentTargetArr = targets.ringTexts[activeRingIndex];
-                    targetOpacity = 1.0; // 成字时清晰度最高
+                    // ** 3. 中间状态 (0.3 to 0.7) -> 矩形照片形状 (过渡) **
+                    currentTargetArr = targets.ringPhotos[activeRingIndex];
+                    // 渐变透明度，从聚字 (高透明度) 到散射 (中透明度)
+                    const fadeProgress = Math.max(0, (handInteractionFactor - closureThreshold) / (openThreshold - closureThreshold));
+                    targetOpacity = 1.0 - fadeProgress * 0.3; 
                     
                     // 隐藏流星系统
                     if(meteorParticles) meteorParticles.visible = false;
                     
                     // 提示文字
-                    hintEl.innerText = loveWords[activeRingIndex];
-                    hintEl.style.opacity = 1;
-                    
-                    // 自动隐藏提示
-                    if (Date.now() - hoverStartTime > 4000) { // 延迟4秒后开始隐藏
-                         if(hintEl.style.opacity > 0) hintEl.style.opacity -= 0.01;
+                    hintEl.innerText = "↔ 调整手势 ↔";
+                    hintEl.style.opacity = 0.5;
                 }
                 
                 currentTargetColor = new THREE.Color(ringColors[activeRingIndex]); // 使用环对应的颜色
