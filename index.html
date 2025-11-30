@@ -744,6 +744,12 @@
                                 controls.target.set(0, 0, 0); 
                                 controls.update();
 
+                                //camera.position.set(0, 0, 100); 
+                               // camera.fov = 80; // 增大 FOV 到 80 度以看全文字
+                                //camera.updateProjectionProjectionMatrix(); 
+                                //controls.target.set(0, 0, 0); 
+                               // controls.update();
+                                
                                 // 显示交互提示
                                 hintEl.innerText = "手掌聚拢: 聚字 | 手掌张开: 粒子散开 (流星)";
                                 hintEl.style.opacity = 1;
@@ -812,6 +818,7 @@
                 if (handInteractionFactor < closureThreshold) {//没有目标
                       controls.autoRotate = true;
                       camera.fov =120;
+                    camera.updateProjectionProjectionMatrix(); 
                    // ** 1. 手掌聚拢 (低因子) -> 聚集成字 (情话) **
                     currentTargetArr = targets.ringTexts[activeRingIndex];
                     targetOpacity = 1.0; // 成字时清晰度最高
@@ -848,6 +855,7 @@
 
                      controls.autoRotate = false;
                       camera.fov = 120;
+                    camera.updateProjectionProjectionMatrix(); 
                     // ** 1. 手掌聚拢 (低因子) -> 聚集成字 (情话) **
                     currentTargetArr = targets.ringTexts[activeRingIndex];
                     targetOpacity = 1.0; // 成字时清晰度最高
@@ -1057,6 +1065,7 @@
     </script>
 </body>
 </html>
+
 
 
 
