@@ -732,13 +732,7 @@
                                 interactionState = STATE.FOCUSED;
                                 controls.autoRotate = false; // 停止自动旋转方便查看
                                 
-                                // --- 视角拉宽调整开始 ---
-                                camera.position.set(0, 0, 100); 
-                                camera.fov = 120; // 增大 FOV 到 120 度以看全文字
-                                camera.updateProjectionProjectionMatrix(); 
-                                controls.target.set(0, 0, 0); 
-                                controls.update();
-                                // --- 视角拉宽调整结束 ---
+
 
                                 // 显示交互提示
                                 hintEl.innerText = "手掌聚拢: 聚字 | 手掌张开: 粒子散开 (流星)";
@@ -1052,6 +1046,7 @@
     </script>
 </body>
 </html>
+
 
 
 
