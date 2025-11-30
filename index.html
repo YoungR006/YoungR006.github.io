@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Three.js 手势交互粒子系统</title>
+    <title>Three.js 浪漫纪念日粒子系统</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; }
         
         #ui-container {
+            /* 调整位置，让 GUI 看起来更干净 */
             position: absolute;
             top: 20px;
             left: 20px;
@@ -78,7 +79,7 @@
             left: 50%;
             transform: translateX(-50%);
             padding: 12px 30px;
-            background: rgba(215, 165, 96, 0.3); /* 土星金色半透明 */
+            background: rgba(255, 0, 127, 0.3); /* 洋红色半透明 */
             border: 1px solid rgba(255, 255, 255, 0.5);
             color: white;
             border-radius: 30px;
@@ -92,7 +93,7 @@
             pointer-events: none; /* 默认不可点击 */
         }
         #back-btn:hover {
-            background: rgba(215, 165, 96, 0.6);
+            background: rgba(255, 0, 127, 0.6);
             transform: translateX(-50%) scale(1.05);
         }
         #back-btn.visible {
@@ -148,32 +149,44 @@
             saturn: [],
             buddha: [],
             fireworks: [],
-            galaxy: [], 
+            galaxy: [],
+            infinity: [], 
             // 5个环对应的照片和文字形状数据
             ringPhotos: [[], [], [], [], []],
             ringTexts: [[], [], [], [], []]
         };
         
-        let currentShape = 'saturn'; 
+        let currentShape = 'infinity'; // 默认设置为浪漫的无限符号
         let handInteractionFactor = 0; // 0 (Closed) -> 1 (Open)
         let prevHandInteractionFactor = 0; // 上一帧的手势因子，用于防抖
-        let targetColor = new THREE.Color(0xd7a560); 
+        let targetColor = new THREE.Color(0xff007f); // 默认颜色：深洋红 (Deep Magenta)
         let baseOpacity = 0.76; // 基础透明度
         
         let photoMesh;
 
-        // --- 彗尾粒子系统变量 ---
+        // --- 彗尾粒子系统变量 (手势追踪) ---
         let cometTailParticles, cometTailGeometry, cometTailMaterial;
         const cometTailParticleCount = 150; 
         const cometTailPositions = new Float32Array(cometTailParticleCount * 3);
         const cometTailColors = new Float32Array(cometTailParticleCount * 3);
         let cometTailIndex = 0; 
-        const cometTailColor = new THREE.Color(0x00ffff); 
+        const cometTailColor = new THREE.Color(0xffa500); // 金色/橙色
         let cometTailWorldPosition = new THREE.Vector3(); // 存储彗尾当前位置
+
+        // --- 流星粒子系统变量 ---
+        let meteorParticles, meteorGeometry, meteorMaterial;
+        const meteorCount = 500; 
+        const meteorAttributes = {
+            positions: new Float32Array(meteorCount * 3),
+            velocities: [], // THREE.Vector3 数组
+            lifespans: new Float32Array(meteorCount), // 当前剩余生命
+            maxLifespans: new Float32Array(meteorCount) // 总生命
+        };
+
 
         // --- 交互状态管理变量 ---
         const STATE = {
-            IDLE: 0,      // 正常土星模式
+            IDLE: 0,      // 正常模式
             HOVERING: 1,  // 正在悬停在某环上
             FOCUSED: 2    // 锁定在某环模式（显示照片/文字）
         };
@@ -190,9 +203,10 @@
         const RESET_THRESHOLD = 2.0; // 移动重置触发时间 (秒)
         const MOVEMENT_SENSITIVITY = 0.5; // 判定为“移动”的距离阈值
 
-        // 情话列表
-        const loveWords = ["一生一世", "海枯石烂", "星河长明", "与你同行", "爱如繁星"];
-        const ringColors = [0xffff00, 0xff0000, 0x0000ff, 0x00ff00, 0xffffff]; // 对应5个环的颜色
+        // 情话列表 (加入纪念日祝福)
+        const loveWords = ["12.7 纪念日快乐", "无限的爱意", "星河长明", "与你同行", "爱如繁星"];
+        // 浪漫的环颜色：金, 深洋红, 薰衣草紫, 青色, 白
+        const ringColors = [0xffa500, 0xff007f, 0x9370db, 0x00ffff, 0xffffff]; 
 
         // --- 初始化 Three.js ---
         function initThree() {
@@ -200,7 +214,15 @@
             document.body.appendChild(container);
 
             scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x000000, 0.002);
+            // 雾气调整为深紫/蓝，营造宇宙感
+            scene.fog = new THREE.FogExp2(0x080010, 0.002); 
+            
+            // 添加柔和的灯光
+            const ambient = new THREE.AmbientLight(0xffffff, 0.2);
+            scene.add(ambient);
+            const pointLight = new THREE.PointLight(0xffffff, 1.5, 500);
+            pointLight.position.set(50, 50, 50);
+            scene.add(pointLight);
 
             camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 2000);
             camera.position.z = 100;
@@ -225,6 +247,7 @@
 
             createParticles();
             createCometTailParticles(); 
+            createMeteorShower(); // <--- 创建流星系统
             
             // 确保彗尾独立于模型，添加到 Scene 中
             scene.add(cometTailParticles); 
@@ -260,8 +283,8 @@
         function loadPhotos() {
             const textureLoader = new THREE.TextureLoader();
             // 使用占位符图片链接，方便测试
-            const frontTexture = textureLoader.load('https://placehold.co/1000x1000/362E4F/ffffff?text=Photo+Front'); 
-            const backTexture = textureLoader.load('https://placehold.co/1000x1000/2E364F/ffffff?text=Photo+Back');
+            const frontTexture = textureLoader.load('https://placehold.co/1000x1000/ff007f/ffffff?text=12.7+Anniversary'); 
+            const backTexture = textureLoader.load('https://placehold.co/1000x1000/9370db/ffffff?text=Love+Forever');
             const photoGeometry = new THREE.PlaneGeometry(30, 30);
             const frontMaterial = new THREE.MeshBasicMaterial({ map: frontTexture, side: THREE.FrontSide });
             const backMaterial = new THREE.MeshBasicMaterial({ map: backTexture, side: THREE.FrontSide });
@@ -348,14 +371,6 @@
 
         function generateShapes() {
             const tempVec = new THREE.Vector3();
-            // 土星生成逻辑保持不变
-            const coreCount = 15000;
-            const outerSatelliteCount = 500;
-            const ringAndSatelliteCount = particleCount - coreCount;
-            const ringCount = ringAndSatelliteCount - outerSatelliteCount;
-            const groupSize = ringCount / 5;
-            const ringStart = coreCount;
-            const outerSatelliteStart = coreCount + ringCount;
 
             for (let i = 0; i < particleCount; i++) {
                 // 1. Cubic Heart
@@ -374,6 +389,13 @@
                 targets.flower.push(tempVec.x, tempVec.y, tempVec.z);
 
                 // 3. Saturn
+                const coreCount = 15000;
+                const outerSatelliteCount = 500;
+                const ringAndSatelliteCount = particleCount - coreCount;
+                const ringCount = ringAndSatelliteCount - outerSatelliteCount;
+                const groupSize = ringCount / 5;
+                const ringStart = coreCount;
+                const outerSatelliteStart = coreCount + ringCount;
                 if (i < ringStart) {
                     const phi = Math.acos(-1 + (2 * i) / ringStart);
                     const theta = Math.sqrt(ringStart * Math.PI) * phi;
@@ -405,7 +427,7 @@
                     targets.saturn.push(Math.cos(angle) * dist, (Math.random()-0.5)*8, Math.sin(angle) * dist);
                 }
 
-                // 4. Buddha
+                // 4. Buddha (保持不变)
                 if (i < particleCount * 0.15) {
                     tempVec.randomDirection().multiplyScalar(8).add(new THREE.Vector3(0, 18, 0));
                     targets.buddha.push(tempVec.x, tempVec.y, tempVec.z);
@@ -417,31 +439,36 @@
                     targets.buddha.push(Math.cos(ang)*r, -8+Math.random()*5, Math.sin(ang)*r*0.8);
                 }
 
-                // 5. Fireworks
+                // 5. Fireworks (保持不变)
                 tempVec.randomDirection().multiplyScalar(50 + Math.random() * 150);
                 targets.fireworks.push(tempVec.x, tempVec.y, tempVec.z);
 
-                // 6. 恢复：漩涡宇宙 (Galaxy Swirl)
-                // 使用对数螺旋生成
+                // 6. Galaxy (保持不变)
                 const arms = 5;
                 const armPoints = particleCount / arms;
-                const spinFactor = 0.5; // 旋转紧密度
+                const spinFactor = 0.5; 
                 const armIndex = i % arms;
-                const pointInArm = Math.floor(i / arms) / (particleCount / arms); // 0 to 1
-                
-                // 距离中心的距离 (增加随机性使边缘扩散)
+                const pointInArm = Math.floor(i / arms) / (particleCount / arms); 
                 const distance = pointInArm * 70 + 5; 
-                // 角度
                 const angleGalaxy = pointInArm * Math.PI * 2 * 3 + (armIndex * Math.PI * 2 / arms) + spinFactor / distance;
-                
                 const randomX = (Math.random()-0.5) * pointInArm * 20;
                 const randomY = (Math.random()-0.5) * pointInArm * 10;
                 const randomZ = (Math.random()-0.5) * pointInArm * 20;
-
                 targets.galaxy.push(
                     Math.cos(angleGalaxy) * distance + randomX,
-                    (Math.random()-0.5) * (15 - distance * 0.1) + randomY, // 中心厚边缘薄
+                    (Math.random()-0.5) * (15 - distance * 0.1) + randomY, 
                     Math.sin(angleGalaxy) * distance + randomZ
+                );
+
+                // 7. Infinity (无限符号)
+                const inf_t = (i / particleCount) * Math.PI * 4; 
+                const inf_a = 35;
+                // 经典8字曲线公式 (Lemniscate)
+                const inf_denom = 1 + Math.sin(inf_t) * Math.sin(inf_t);
+                targets.infinity.push(
+                    inf_a * Math.cos(inf_t) / inf_denom,
+                    inf_a * Math.sin(inf_t) * Math.cos(inf_t) / inf_denom,
+                    (Math.random() - 0.5) * 5 
                 );
             }
         }
@@ -459,8 +486,13 @@
 
             const circleSprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png'); 
             material = new THREE.PointsMaterial({
-                size: 1.2, map: circleSprite, vertexColors: true, blending: THREE.AdditiveBlending,
-                depthWrite: false, transparent: true, opacity: baseOpacity 
+                size: 1.1, // 默认粒子大小设置为 1.1
+                map: circleSprite, 
+                vertexColors: true, 
+                blending: THREE.AdditiveBlending, // 叠加混合，增加发光效果
+                depthWrite: false, 
+                transparent: true, 
+                opacity: baseOpacity 
             });
             particles = new THREE.Points(geometry, material);
             scene.add(particles);
@@ -475,38 +507,179 @@
             cometTailGeometry.setAttribute('color', new THREE.BufferAttribute(cometTailColors, 3));
             const circleSprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png'); 
             cometTailMaterial = new THREE.PointsMaterial({
-                size: 2, map: circleSprite, vertexColors: true, blending: THREE.AdditiveBlending,
-                depthWrite: false, transparent: true, opacity: 1.0 
+                size: 3, // 彗尾更大
+                map: circleSprite, 
+                vertexColors: true, 
+                blending: THREE.AdditiveBlending,
+                depthWrite: false, 
+                transparent: true, 
+                opacity: 1.0 
             });
             cometTailParticles = new THREE.Points(cometTailGeometry, cometTailMaterial);
         }
+        
+        // --- 流星系统创建 ---
+        function createMeteorShower() {
+            meteorGeometry = new THREE.BufferGeometry();
+            const initialSizes = new Float32Array(meteorCount); // 用于控制流星大小/渐隐
+            
+            meteorGeometry.setAttribute('position', new THREE.BufferAttribute(meteorAttributes.positions, 3));
+            meteorGeometry.setAttribute('size', new THREE.BufferAttribute(initialSizes, 1)); 
+
+            const starSprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png');
+            meteorMaterial = new THREE.PointsMaterial({
+                size: 2.0, 
+                map: starSprite,
+                color: 0x99ccff, // 柔和的流星色 (浅蓝)
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                transparent: true,
+                sizeAttenuation: true // 允许使用 size 属性控制单个粒子大小
+            });
+
+            meteorParticles = new THREE.Points(meteorGeometry, meteorMaterial);
+            meteorParticles.visible = false; // 默认隐藏
+            scene.add(meteorParticles);
+            
+            // 初始化速度、生命和大小
+            for (let i = 0; i < meteorCount; i++) {
+                meteorAttributes.velocities.push(new THREE.Vector3());
+                meteorGeometry.attributes.size.array[i] = 0.0; // 初始大小为0
+                resetMeteor(i);
+            }
+        }
+        
+        // --- 重置单个流星 ---
+        function resetMeteor(i) {
+            const i3 = i * 3;
+            const pos = meteorAttributes.positions;
+            const vel = meteorAttributes.velocities[i];
+            
+            // 随机起始位置 (从后方远处出现)
+            // X 和 Y 稍微分散，Z 轴在屏幕外
+            pos[i3] = (Math.random() - 0.5) * 400; 
+            pos[i3 + 1] = (Math.random() - 0.5) * 50; 
+            pos[i3 + 2] = -200 - Math.random() * 50; 
+            
+            // 速度: 主要向前景移动 (正Z)
+            const speed = 100 + Math.random() * 100; 
+            vel.set(
+                (Math.random() - 0.5) * 10, // 侧向漂移
+                (Math.random() - 0.5) * 5,  // 垂直漂移
+                speed // 主速度
+            );
+            
+            // Lifespan
+            const maxLife = 4.0 + Math.random() * 2.0; 
+            meteorAttributes.maxLifespans[i] = maxLife;
+            meteorAttributes.lifespans[i] = maxLife;
+            
+            // 保证新流星从头开始显示
+            meteorGeometry.attributes.size.array[i] = 0.0;
+        }
+
 
         function initGUI() {
-            const gui = new GUI({ container: document.getElementById('ui-container'), closed: true }); 
+            // 现代简约：默认打开，设置标题
+            const gui = new GUI({ 
+                container: document.getElementById('ui-container'), 
+                title: '浪漫宇宙控制台', 
+                closed: false 
+            }); 
+            
             const params = {
-                shape: 'saturn', color: '#d7a560', particleSize: 1.2, 
+                shape: currentShape, 
+                color: '#ff007f', 
+                particleSize: 1.1, // 默认值 1.1
                 resetCamera: () => {
-                    camera.position.set(0, 20, 100); camera.fov = 55;
-                    camera.updateProjectionMatrix(); controls.target.set(0, 0, 0); controls.update();
+                    camera.position.set(0, 20, 100); 
+                    camera.fov = 55;
+                    camera.updateProjectionMatrix(); 
+                    controls.target.set(0, 0, 0); 
+                    controls.update();
                 }
             };
-            // 重新添加 galaxy 选项
-            gui.add(params, 'shape', ['saturn', 'galaxy', 'cubicHeart', 'flower', 'buddha', 'fireworks']).name('模型选择').onChange(val => {
+            
+            // --- 模型与风格 ---
+            const modelFolder = gui.addFolder('模型与风格');
+            modelFolder.add(params, 'shape', ['infinity', 'saturn', 'galaxy', 'cubicHeart', 'flower', 'buddha', 'fireworks']).name('模型选择').onChange(val => {
                 currentShape = val;
-                resetToUniverse(); // 切换模型时强制重置
+                resetToUniverse();
                 
-                if(val === 'saturn') params.color = '#d7a560';
-                if(val === 'galaxy') params.color = '#aa00ff';
+                // 匹配颜色
+                if(val === 'saturn') params.color = '#ff007f';
+                if(val === 'galaxy') params.color = '#9370db';
+                if(val === 'infinity') params.color = '#ff007f';
                 if(val === 'cubicHeart') params.color = '#ff69b4';
                 if(val === 'flower') params.color = '#ffcc00';
                 if(val === 'buddha') params.color = '#00ffff';
                 if(val === 'fireworks') params.color = '#ffffff';
                 targetColor.set(params.color);
             });
-            gui.addColor(params, 'color').name('粒子颜色').onChange(val => targetColor.set(val));
-            gui.add(params, 'particleSize', 0.5, 5).name('粒子大小').onChange(val => material.size = val);
-            gui.add(params, 'resetCamera').name('重置视角');
+            modelFolder.addColor(params, 'color').name('粒子颜色').onChange(val => targetColor.set(val));
+            modelFolder.add(params, 'particleSize', 0.5, 5).name('粒子大小').onChange(val => material.size = val);
+            
+            // --- 视角调试 (新增) ---
+            const cameraFolder = gui.addFolder('视角调试');
+            
+            // 直接绑定到 camera.position，并使用 .listen() 监听 resetCamera 引起的变动
+            cameraFolder.add(camera.position, 'x', -200, 200).step(1).name('Camera X').listen();
+            cameraFolder.add(camera.position, 'y', -200, 200).step(1).name('Camera Y').listen();
+            cameraFolder.add(camera.position, 'z', 0, 400).step(1).name('Camera Z').listen();
+            
+            // 绑定到 camera.fov，并在变化时更新投影矩阵
+            cameraFolder.add(camera, 'fov', 10, 120).step(1).name('FOV').onChange(() => {
+                camera.updateProjectionMatrix();
+            }).listen();
+            
+            cameraFolder.add(params, 'resetCamera').name('重置视角');
         }
+        
+        // --- 流星系统更新 ---
+        function updateMeteorShower(dt) {
+            if (meteorParticles.visible === false) return;
+
+            const positions = meteorParticles.geometry.attributes.position.array;
+            const sizes = meteorParticles.geometry.attributes.size.array; 
+
+            for (let i = 0; i < meteorCount; i++) {
+                const i3 = i * 3;
+                
+                // 1. 更新生命
+                meteorAttributes.lifespans[i] -= dt;
+                
+                // 2. 检查是否重置 (生命耗尽或飞出屏幕)
+                if (meteorAttributes.lifespans[i] < 0 || positions[i3+2] > 200) {
+                    resetMeteor(i);
+                }
+
+                // 3. 更新位置
+                const vel = meteorAttributes.velocities[i];
+                positions[i3] += vel.x * dt;
+                positions[i3 + 1] += vel.y * dt;
+                positions[i3 + 2] += vel.z * dt;
+
+                // 4. 计算大小 (模拟渐隐/渐现)
+                const life = meteorAttributes.lifespans[i];
+                const maxLife = meteorAttributes.maxLifespans[i];
+                const normalizedLife = life / maxLife; 
+                
+                let sizeFactor;
+                // 在生命周期两端 (0-0.2 和 0.8-1.0) 渐变
+                if (normalizedLife > 0.8) { 
+                    sizeFactor = (1 - normalizedLife) * 5; 
+                } else if (normalizedLife < 0.2) { 
+                    sizeFactor = normalizedLife * 5;
+                } else {
+                    sizeFactor = 1.0;
+                }
+                sizes[i] = sizeFactor * 3.0; // 基准大小设为3.0
+            }
+            
+            meteorParticles.geometry.attributes.position.needsUpdate = true;
+            meteorParticles.geometry.attributes.size.needsUpdate = true;
+        }
+
 
         function animate() {
             requestAnimationFrame(animate);
@@ -518,12 +691,22 @@
             // --- 核心状态机逻辑 ---
             const hintEl = document.getElementById('hint-text');
             const backBtn = document.getElementById('back-btn');
+            
+            // 流星显示控制 (只有在土星模型下才显示和更新流星)
+            const showMeteors = currentShape === 'saturn';
+            if (meteorParticles) meteorParticles.visible = showMeteors; 
+            
+            if (showMeteors) { 
+                updateMeteorShower(dt); // <--- 更新流星系统
+            }
+
 
             if (currentShape === 'saturn') {
                 // 1. IDLE 模式：检测悬停
                 if (interactionState === STATE.IDLE || interactionState === STATE.HOVERING) {
                     
                     // 计算彗尾到中心的距离 (XY平面投影)
+                    // 注意：彗尾Z=0，所以这里只考虑XY
                     const dist = Math.sqrt(cometTailWorldPosition.x * cometTailWorldPosition.x + cometTailWorldPosition.y * cometTailWorldPosition.y);
                     
                     // 映射距离到环的索引 (近似范围)
@@ -585,6 +768,7 @@
                 }
             } else {
                 interactionState = STATE.IDLE; // 非土星模式不交互
+                activeRingIndex = -1; // 非土星模式不激活环
             }
             
             lastCometPos.copy(cometTailWorldPosition);
@@ -611,23 +795,19 @@
                     // ** 手掌聚拢 (或默认) -> 照片 **
                     currentTargetArr = targets.ringPhotos[activeRingIndex];
                     
-                    // 3. 汇聚消散效果：
-                    // Factor 从 0.6 -> 0 (闭合)。
-                    // 映射 factor 到 0~1 的进度 (closedProgress: 1 means fully closed)
-                    // 当完全闭合时，Opacity -> 0, Scale -> 0
-                    const fadeProgress = Math.max(0, handInteractionFactor / 0.6); // 0 (closed) to 1 (near trigger)
+                    const fadeProgress = Math.max(0, handInteractionFactor / 0.6); 
                     
-                    targetOpacity = fadeProgress; // 越闭合越透明
-                    shrinkScale = 0.1 + 0.9 * fadeProgress; // 越闭合越向中心收缩
+                    targetOpacity = fadeProgress; 
+                    shrinkScale = 0.1 + 0.9 * fadeProgress; 
                 }
                 currentTargetColor = new THREE.Color(ringColors[activeRingIndex]); // 使用环对应的颜色
             } else {
-                // 默认土星或其他形状
+                // 默认无限符号或其他形状
                 currentTargetArr = targets[currentShape];
                 targetOpacity = baseOpacity;
             }
             
-            // 颜色和透明度过渡速度从 0.05 提升到 0.1
+            // 颜色和透明度过渡速度
             material.opacity += (targetOpacity - material.opacity) * 0.1;
 
             // --- 粒子更新循环 ---
@@ -637,7 +817,7 @@
             const sinRot = Math.sin(rotAngle);
             const isFireworks = currentShape === 'fireworks';
             
-            // 粒子运动速度从 0.05 提升到 0.1
+            // 粒子运动速度
             const speed = isFireworks ? 0.02 : 0.1; 
 
             // 土星颜色逻辑复用
@@ -648,8 +828,8 @@
             const ringStart = coreCount; 
             const outerSatelliteStart = coreCount + ringCount; 
             const groupColors = [
-                new THREE.Color(0xffff00), new THREE.Color(0xff0000), 
-                new THREE.Color(0x0000ff), new THREE.Color(0x00ff00), 
+                new THREE.Color(0xffa500), new THREE.Color(0xff007f), // 使用新的浪漫颜色
+                new THREE.Color(0x9370db), new THREE.Color(0x00ffff), 
                 new THREE.Color(0xffffff)
             ];
 
@@ -660,7 +840,7 @@
                 let tz = currentTargetArr[ix+2];
 
                 // 3. 应用收缩缩放 (仅在照片模式下生效)
-                if (interactionState === STATE.FOCUSED && shrinkScale < 0.99) {
+                if (interactionState === STATE.FOCUSED && currentShape === 'saturn' && shrinkScale < 0.99) {
                     tx *= shrinkScale;
                     ty *= shrinkScale;
                     tz *= shrinkScale;
@@ -668,9 +848,12 @@
 
                 // 旋转逻辑 (仅在非聚焦模式下旋转，聚焦时文字需要正对)
                 if (interactionState !== STATE.FOCUSED) {
-                     const ox = tx; const oz = tz;
-                     tx = ox * cosRot - oz * sinRot;
-                     tz = ox * sinRot + oz * cosRot;
+                    // 如果是 Infinity 或 CubicHeart，可以增加一个Y轴的自旋
+                    if (currentShape === 'infinity' || currentShape === 'cubicHeart') {
+                        const ox = tx; const oz = tz;
+                        tx = ox * cosRot - oz * sinRot;
+                        tz = ox * sinRot + oz * cosRot;
+                    }
                 }
 
                 // 颜色逻辑
@@ -705,9 +888,10 @@
                     let distance = (headIndex - i + cometTailParticleCount) % cometTailParticleCount;
                     let normDist = distance / cometTailParticleCount; 
                     const alpha = Math.pow(Math.max(0, 1 - normDist), 6); 
-                    ctColors[i * 3] = cometTailColor.r * alpha;
-                    ctColors[i * 3 + 1] = cometTailColor.g * alpha;
-                    ctColors[i * 3 + 2] = cometTailColor.b * alpha;
+                    // 颜色插值让彗尾头部更亮
+                    ctColors[i * 3] = cometTailColor.r + (1 - cometTailColor.r) * alpha; 
+                    ctColors[i * 3 + 1] = cometTailColor.g + (1 - cometTailColor.g) * alpha;
+                    ctColors[i * 3 + 2] = cometTailColor.b + (1 - cometTailColor.b) * alpha;
                 }
                 cometTailParticles.geometry.attributes.color.needsUpdate = true;
             }
@@ -743,7 +927,7 @@
                 if (cometTailParticles) {
                     const worldRange = 160; 
                     
-                    // *** 修正: 反转 X 轴映射方向，使彗尾运动方向与镜像视频一致 ***
+                    // 修正: 反转 X 轴映射方向，使彗尾运动方向与镜像视频一致
                     const worldX = -(index.x - 0.5) * worldRange; 
                     const worldY = -(index.y - 0.5) * worldRange; 
                     
