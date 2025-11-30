@@ -811,7 +811,7 @@
 
                 if (handInteractionFactor < closureThreshold) {//没有目标
                       controls.autoRotate = true;
-                      camera.fov = 80;
+                      camera.fov =120;
                    // ** 1. 手掌聚拢 (低因子) -> 聚集成字 (情话) **
                     currentTargetArr = targets.ringTexts[activeRingIndex];
                     targetOpacity = 1.0; // 成字时清晰度最高
@@ -847,7 +847,7 @@
 
 
                      controls.autoRotate = false;
-                      camera.fov = 80;
+                      camera.fov = 120;
                     // ** 1. 手掌聚拢 (低因子) -> 聚集成字 (情话) **
                     currentTargetArr = targets.ringTexts[activeRingIndex];
                     targetOpacity = 1.0; // 成字时清晰度最高
@@ -1057,6 +1057,7 @@
     </script>
 </body>
 </html>
+
 
 
 
