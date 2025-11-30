@@ -289,8 +289,8 @@
         function loadPhotos() {
             const textureLoader = new THREE.TextureLoader();
             // 使用占位符图片链接，方便测试
-            const frontTexture = textureLoader.load('https://placehold.co/1000x1000/ff007f/ffffff?text=12.7+Anniversary'); 
-            const backTexture = textureLoader.load('https://placehold.co/1000x1000/9370db/ffffff?text=Love+Forever');
+            const frontTexture = textureLoader.load('https://raw.githubusercontent.com/YoungR006/YoungR006.github.io/main/1.jpg'); 
+            const backTexture = textureLoader.load('https://raw.githubusercontent.com/YoungR006/YoungR006.github.io/main/2.jpg');
             const photoGeometry = new THREE.PlaneGeometry(30, 30);
             const frontMaterial = new THREE.MeshBasicMaterial({ map: frontTexture, side: THREE.FrontSide });
             const backMaterial = new THREE.MeshBasicMaterial({ map: backTexture, side: THREE.FrontSide });
@@ -1043,6 +1043,7 @@
     </script>
 </body>
 </html>
+
 
 
 
