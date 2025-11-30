@@ -806,7 +806,7 @@
                 const openThreshold = 0.7;    // 手掌张开阈值 (散开)
 
                 if (handInteractionFactor < closureThreshold) {
-                    controls.autoRotate = true;
+                   
                     // ** 1. 手掌聚拢 (低因子) -> 聚集成字 (情话) **
                     currentTargetArr = targets.ringTexts[activeRingIndex];
                     targetOpacity = 1.0; // 成字时清晰度最高
@@ -825,6 +825,9 @@
 
                 } else if (handInteractionFactor >= openThreshold) {
                     // ** 2. 手掌张开 (高因子) -> 散开流星 **
+                     controls.autoRotate = true;
+                    camera.position.x = 0;
+                    camera.position.y = 0;
                     camera.position.z = 100;
                     currentTargetArr = targets.fireworks; // 复用 fireworks 散射目标
                     targetOpacity = 0.7; // 散开时稍微透明
@@ -837,7 +840,8 @@
                     hintEl.style.opacity = 1;
 
                 } else {
-
+                    camera.position.x = 0;
+                    camera.position.y = 0;
                     camera.position.z = 400;
                     // ** 1. 手掌聚拢 (低因子) -> 聚集成字 (情话) **
                     currentTargetArr = targets.ringTexts[activeRingIndex];
@@ -1048,6 +1052,7 @@
     </script>
 </body>
 </html>
+
 
 
 
