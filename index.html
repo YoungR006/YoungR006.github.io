@@ -53,12 +53,31 @@
             text-align: center;
             pointer-events: none;
         }
+        
+        /* 交互提示文字 */
+        #hint-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(255,255,255,0.8);
+            font-size: 32px;
+            font-weight: bold;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 1s;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+            letter-spacing: 5px;
+            z-index: 8;
+        }
     </style>
 </head>
 <body>
 
     <div id="loading">正在初始化摄像头与AI模型...<br><span style="font-size:14px; opacity:0.7">请允许摄像头权限</span></div>
     
+    <div id="hint-text"></div>
+
     <video class="input_video" playsinline></video>
     
     <button id="fullscreen-btn">⛶ 全屏模式</button>
@@ -85,20 +104,24 @@
         let scene, camera, renderer, particles, geometry, material;
         let controls;
         let originalAutoRotateSpeed = 1.0; 
-        let time = 0; // 用于控制粒子旋转和浮动的时间变量
+        let time = 0; 
 
         // 粒子总数 40000
         const particleCount = 40000; 
-        const targets = {     // 存储各形状的目标位置
+        const targets = {     
             cubicHeart: [],
             flower: [],
             saturn: [],
             buddha: [],
             fireworks: [],
+            // 新增：5个环对应的照片和文字形状数据
+            ringPhotos: [[], [], [], [], []],
+            ringTexts: [[], [], [], [], []]
         };
+        
         let currentShape = 'saturn'; 
-        let handInteractionFactor = 0;
-        let targetColor = new THREE.Color(0xd7a560); // GUI 控制的核心颜色
+        let handInteractionFactor = 0; // 0 (Closed) -> 1 (Open)
+        let targetColor = new THREE.Color(0xd7a560); 
         
         let photoMesh;
 
@@ -108,8 +131,31 @@
         const cometTailPositions = new Float32Array(cometTailParticleCount * 3);
         const cometTailColors = new Float32Array(cometTailParticleCount * 3);
         let cometTailIndex = 0; 
-        const cometTailColor = new THREE.Color(0x00ffff); // 彗尾颜色 (青色)
-        const tempScreenVector = new THREE.Vector3(); 
+        const cometTailColor = new THREE.Color(0x00ffff); 
+        let cometTailWorldPosition = new THREE.Vector3(); // 存储彗尾当前位置
+
+        // --- 交互状态管理变量 ---
+        const STATE = {
+            IDLE: 0,      // 正常土星模式
+            HOVERING: 1,  // 正在悬停在某环上
+            FOCUSED: 2    // 锁定在某环模式（显示照片/文字）
+        };
+        let interactionState = STATE.IDLE;
+        
+        let activeRingIndex = -1; // 当前激活的环索引 (0-4)
+        
+        // 计时器
+        let hoverStartTime = 0;      // 开始悬停的时间
+        let movementStartTime = 0;   // 开始移动（非悬停）的时间
+        let lastCometPos = new THREE.Vector3();
+        
+        const HOVER_THRESHOLD = 2.0; // 悬停触发时间 (秒)
+        const RESET_THRESHOLD = 2.0; // 移动重置触发时间 (秒)
+        const MOVEMENT_SENSITIVITY = 0.5; // 判定为“移动”的距离阈值
+
+        // 情话列表
+        const loveWords = ["一生一世", "海枯石烂", "星河长明", "与你同行", "爱如繁星"];
+        const ringColors = [0xffff00, 0xff0000, 0x0000ff, 0x00ff00, 0xffffff]; // 对应5个环的颜色
 
         // --- 初始化 Three.js ---
         function initThree() {
@@ -136,320 +182,246 @@
 
             loadPhotos();
 
-            // 创建粒子系统（主粒子和彗尾粒子）
+            // 生成形状数据
             generateShapes();
+            generateInteractionShapes(); // 生成照片和文字形状
+
             createParticles();
             createCometTailParticles(); 
             
-            // 将彗尾粒子添加到场景 (Scene) 中，使其不随模型旋转
             scene.add(cometTailParticles); 
             
             initGUI();
             
             window.addEventListener('resize', onWindowResize);
-            
             document.getElementById('fullscreen-btn').addEventListener('click', () => {
-                if (!document.fullscreenElement) {
-                    document.documentElement.requestFullscreen();
-                } else {
-                    document.exitFullscreen();
-                }
+                if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+                else document.exitFullscreen();
             });
 
             animate();
         }
 
-        // --- 加载并添加照片 ---
         function loadPhotos() {
             const textureLoader = new THREE.TextureLoader();
-            
-            // =======================================================
-            // !!! 替换照片路径的位置 !!!
-            // =======================================================
-            // 使用占位符图片。请将 'https://placehold.co/...' 替换为您自己的图片 URL。
-            const frontTexture = textureLoader.load('https://placehold.co/1000x1000/362E4F/ffffff?text=Photo+Front'); // <-- 照片正面纹理
-            const backTexture = textureLoader.load('https://placehold.co/1000x1000/2E364F/ffffff?text=Photo+Back');   // <-- 照片背面纹理
-
+            const frontTexture = textureLoader.load('https://placehold.co/1000x1000/362E4F/ffffff?text=Photo+Front'); 
+            const backTexture = textureLoader.load('https://placehold.co/1000x1000/2E364F/ffffff?text=Photo+Back');
             const photoGeometry = new THREE.PlaneGeometry(30, 30);
-
-            const frontMaterial = new THREE.MeshBasicMaterial({ 
-                map: frontTexture,
-                side: THREE.FrontSide
-            });
-            const frontMesh = new THREE.Mesh(photoGeometry, frontMaterial);
-            
-            const backMaterial = new THREE.MeshBasicMaterial({ 
-                map: backTexture,
-                side: THREE.FrontSide
-            });
+            const frontMaterial = new THREE.MeshBasicMaterial({ map: frontTexture, side: THREE.FrontSide });
+            const backMaterial = new THREE.MeshBasicMaterial({ map: backTexture, side: THREE.FrontSide });
             const backMesh = new THREE.Mesh(photoGeometry, backMaterial);
-
             backMesh.rotation.y = Math.PI;
 
             photoMesh = new THREE.Group();
-            photoMesh.add(frontMesh);
+            photoMesh.add(new THREE.Mesh(photoGeometry, frontMaterial));
             photoMesh.add(backMesh);
-            
             photoMesh.position.set(0, 0, 0); 
             scene.add(photoMesh);
-            
             photoMesh.rotationSpeed = 0.005;
         }
 
+        // --- 辅助：生成文字粒子坐标 ---
+        function createStringParticles(text) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 400; 
+            canvas.height = 200;
+            
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.font = 'bold 80px "Microsoft YaHei", sans-serif'; // 使用粗体中文字体
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, canvas.width/2, canvas.height/2);
+            
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            const points = [];
+            
+            // 扫描像素
+            for(let y=0; y<canvas.height; y+=2) { // 步长2以减少点数
+                for(let x=0; x<canvas.width; x+=2) {
+                    const index = (y * canvas.width + x) * 4;
+                    if(data[index] > 128) { // 如果是白色像素
+                        // 将2D坐标映射到3D空间
+                        points.push(
+                            (x - canvas.width/2) * 0.5, // x
+                            (canvas.height/2 - y) * 0.5, // y (反转)
+                            0 // z
+                        );
+                    }
+                }
+            }
+            return points;
+        }
 
-        // --- 粒子形状生成算法 ---
+        // --- 辅助：生成矩形照片粒子坐标 ---
+        function createRectParticles(width, height) {
+            const points = [];
+            const stepsX = 140; // 密度
+            const stepsY = 140;
+            for (let i = 0; i < stepsX; i++) {
+                for (let j = 0; j < stepsY; j++) {
+                    const x = (i / stepsX - 0.5) * width;
+                    const y = (j / stepsY - 0.5) * height;
+                    points.push(x, y, 0);
+                }
+            }
+            return points;
+        }
+
+        // --- 预生成交互形状 (照片和文字) ---
+        function generateInteractionShapes() {
+            for (let i = 0; i < 5; i++) {
+                // 1. 生成文字形状
+                const textPoints = createStringParticles(loveWords[i]);
+                // 填充到40000个点，循环使用
+                const textTarget = [];
+                for(let k=0; k<particleCount; k++) {
+                    const pIndex = (k % (textPoints.length/3)) * 3;
+                    textTarget.push(textPoints[pIndex], textPoints[pIndex+1], textPoints[pIndex+2]);
+                }
+                targets.ringTexts[i] = textTarget;
+
+                // 2. 生成照片形状 (矩形)
+                const photoPoints = createRectParticles(80, 60); // 宽80 高60
+                const photoTarget = [];
+                for(let k=0; k<particleCount; k++) {
+                     const pIndex = (k % (photoPoints.length/3)) * 3;
+                     // 稍微加一点Z轴随机性，让照片看起来有厚度
+                     photoTarget.push(photoPoints[pIndex], photoPoints[pIndex+1], photoPoints[pIndex+2] + (Math.random()-0.5)*2);
+                }
+                targets.ringPhotos[i] = photoTarget;
+            }
+        }
+
         function generateShapes() {
             const tempVec = new THREE.Vector3();
-            const photoOffsetX = 0;
-            const photoOffsetY = 0;
-            const photoOffsetZ = 0;
-
-            // 土星粒子分布的常量
-            const coreCount = 15000; // 土星核心粒子数保持不变
-            
-            const outerSatelliteCount = 500; // 500 个粒子作为最外层特殊卫星
-            const ringAndSatelliteCount = particleCount - coreCount; // 40000 - 15000 = 25000 
-            const ringCount = ringAndSatelliteCount - outerSatelliteCount; // 25000 - 500 = 24500 particles for the middle ring
-            
-            const groupSize = ringCount / 5; // 24500 / 5 = 4900 per satellite group
-            
-            const ringStart = coreCount; // 15000
-            const outerSatelliteStart = coreCount + ringCount; // 39500
+            // 土星生成逻辑保持不变
+            const coreCount = 15000;
+            const outerSatelliteCount = 500;
+            const ringAndSatelliteCount = particleCount - coreCount;
+            const ringCount = ringAndSatelliteCount - outerSatelliteCount;
+            const groupSize = ringCount / 5;
+            const ringStart = coreCount;
+            const outerSatelliteStart = coreCount + ringCount;
 
             for (let i = 0; i < particleCount; i++) {
-                // 1. 立方体爱心 
+                // ... (Cubic Heart, Flower 逻辑保持不变，略) ...
+                // 1. Cubic Heart
                 let x, y, z, t;
                 t = Math.random() * Math.PI * 2;
-                
                 x = 16 * Math.pow(Math.sin(t), 3);
                 y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
-
                 z = (Math.random() - 0.5) * 20;
-                x += (Math.random() - 0.5) * 5;
-                y += (Math.random() - 0.5) * 5;
+                targets.cubicHeart.push(x * 1.5, y * 1.5, z);
 
-                const scale = 1.5; // 增加尺寸
-                targets.cubicHeart.push(x * scale + photoOffsetX, y * scale + photoOffsetY, z + photoOffsetZ);
-
-
-                // 2. 花朵 
+                // 2. Flower
                 const f_theta = Math.random() * Math.PI * 2;
                 const f_phi = Math.random() * Math.PI;
-                const k = 3; 
-                // 增加半径
-                const radius_f = 40 * Math.sin(k * f_theta) * Math.sin(f_phi) + 15;
+                const radius_f = 40 * Math.sin(3 * f_theta) * Math.sin(f_phi) + 15;
                 tempVec.setFromSphericalCoords(radius_f, f_phi, f_theta);
-                targets.flower.push(tempVec.x + photoOffsetX, tempVec.y + photoOffsetY, tempVec.z + photoOffsetZ);
+                targets.flower.push(tempVec.x, tempVec.y, tempVec.z);
 
-                // 3. 土星 
+                // 3. Saturn (核心 + 5环 + 外环)
                 if (i < ringStart) {
-                    // 核心 (球体)
                     const phi = Math.acos(-1 + (2 * i) / ringStart);
                     const theta = Math.sqrt(ringStart * Math.PI) * phi;
-                    const r = 35; // 增加尺寸
-                    tempVec.setFromSphericalCoords(r, phi, theta);
-                    targets.saturn.push(tempVec.x + photoOffsetX, tempVec.y + photoOffsetY, tempVec.z + photoOffsetZ);
+                    tempVec.setFromSphericalCoords(35, phi, theta);
+                    targets.saturn.push(tempVec.x, tempVec.y, tempVec.z);
                 } 
                 else if (i < outerSatelliteStart) {
-                    // 5个不同形状/颜色的卫星群 (星环)
                     const particleIndexInRing = i - ringStart; 
-                    
                     let angle = Math.random() * Math.PI * 2;
                     let dist = 0;
-                    let y_offset = (Math.random()-0.5) * 4; // 默认轻薄 (增加厚度以突出)
-
-                    // 定义各组环的半径和特征
+                    let y_offset = (Math.random()-0.5) * 4; 
                     const baseRadius = 45;
-                    // 环带之间的间距
                     const groupSpacing = 10.0; 
-                    
                     let groupIndex = Math.floor(particleIndexInRing / groupSize);
 
                     switch (groupIndex) {
-                        case 0: // Group 1: Yellow (Inner Middle) - 紧密环
-                            dist = baseRadius + Math.random() * 2; 
-                            break;
-                        case 1: // Group 2: Red (Middle) - 较厚环
-                            dist = baseRadius + groupSpacing * 1 + Math.random() * 3;
-                            y_offset = (Math.random()-0.5) * 6; // 增加厚度
-                            break;
-                        case 2: // Group 3: Blue (Outer Middle) - 紧密环
-                            dist = baseRadius + groupSpacing * 2 + Math.random() * 2;
-                            break;
-                        case 3: // Group 4: Green (Gap 1) - 较散射
-                            dist = baseRadius + groupSpacing * 3 + Math.random() * 1.5;
-                            y_offset = (Math.random()-0.5) * 7; // 增加厚度
-                            angle += (Math.random() - 0.5) * 0.5; // 角度分散
-                            break;
-                        case 4: // Group 5: White (Gap 2) - 最散射
-                            dist = baseRadius + groupSpacing * 4 + Math.random() * 3.5;
-                            y_offset = (Math.random()-0.5) * 8; // 增加厚度
-                            angle += (Math.random() - 0.5) * 1.0; 
-                            break;
-                        default:
-                            dist = 60 + Math.random() * 5; // Fallback
+                        case 0: dist = baseRadius + Math.random() * 2; break;
+                        case 1: dist = baseRadius + groupSpacing * 1 + Math.random() * 3; y_offset=(Math.random()-0.5)*6; break;
+                        case 2: dist = baseRadius + groupSpacing * 2 + Math.random() * 2; break;
+                        case 3: dist = baseRadius + groupSpacing * 3 + Math.random() * 1.5; y_offset=(Math.random()-0.5)*7; angle+=(Math.random()-0.5)*0.5; break;
+                        case 4: dist = baseRadius + groupSpacing * 4 + Math.random() * 3.5; y_offset=(Math.random()-0.5)*8; angle+=(Math.random()-0.5)*1.0; break;
+                        default: dist = 60;
                     }
-                    
-                    targets.saturn.push(Math.cos(angle) * dist + photoOffsetX, y_offset + photoOffsetY, Math.sin(angle) * dist + photoOffsetZ);
-
+                    targets.saturn.push(Math.cos(angle) * dist, y_offset, Math.sin(angle) * dist);
                 }
                 else {
-                    // 特殊小卫星 (Outer Satellite) - 保留
                     const angle = Math.random() * Math.PI * 2;
-                    // 设置一个更大的轨道半径，使其位于主星环外部
-                    const dist = 90 + Math.random() * 10; // 调整最外层卫星轨道半径以匹配更大的星环
-                    const y_offset = (Math.random() - 0.5) * 8; // 增加厚度
-                    targets.saturn.push(
-                        Math.cos(angle) * dist + photoOffsetX, 
-                        y_offset + photoOffsetY, 
-                        Math.sin(angle) * dist + photoOffsetZ
-                    );
+                    const dist = 90 + Math.random() * 10; 
+                    targets.saturn.push(Math.cos(angle) * dist, (Math.random()-0.5)*8, Math.sin(angle) * dist);
                 }
 
-                // 4. 佛像意象 
+                // 4. Buddha
                 if (i < particleCount * 0.15) {
-                    const r = 8;
-                    tempVec.randomDirection().multiplyScalar(r).add(new THREE.Vector3(0, 18, 0));
-                    targets.buddha.push(tempVec.x + photoOffsetX, tempVec.y + photoOffsetY, tempVec.z + photoOffsetZ);
-                } 
-                else if (i < particleCount * 0.5) {
-                    const r = 12;
-                    const h = Math.random() * 20;
-                    const angle = Math.random() * Math.PI * 2;
-                    targets.buddha.push(Math.cos(angle)*r * (1 - h/30) + photoOffsetX, h - 5 + photoOffsetY, Math.sin(angle)*r * (1 - h/30) + photoOffsetZ);
-                }
-                else {
-                    const angle = Math.random() * Math.PI * 2;
-                    const r = 20 + Math.random() * 15; // 增加尺寸
-                    targets.buddha.push(Math.cos(angle)*r + photoOffsetX, -8 + Math.random()*5 + photoOffsetY, Math.sin(angle)*r * 0.8 + photoOffsetZ);
+                    tempVec.randomDirection().multiplyScalar(8).add(new THREE.Vector3(0, 18, 0));
+                    targets.buddha.push(tempVec.x, tempVec.y, tempVec.z);
+                } else if (i < particleCount * 0.5) {
+                    const r = 12; const h = Math.random() * 20; const ang = Math.random()*Math.PI*2;
+                    targets.buddha.push(Math.cos(ang)*r*(1-h/30), h-5, Math.sin(ang)*r*(1-h/30));
+                } else {
+                    const ang = Math.random()*Math.PI*2; const r = 20+Math.random()*15;
+                    targets.buddha.push(Math.cos(ang)*r, -8+Math.random()*5, Math.sin(ang)*r*0.8);
                 }
 
-                // 5. 烟花 
-                // 增加爆炸范围
+                // 5. Fireworks
                 tempVec.randomDirection().multiplyScalar(50 + Math.random() * 150);
-                targets.fireworks.push(tempVec.x + photoOffsetX, tempVec.y + photoOffsetY, tempVec.z + photoOffsetZ);
+                targets.fireworks.push(tempVec.x, tempVec.y, tempVec.z);
             }
         }
 
         function createParticles() {
             geometry = new THREE.BufferGeometry();
-            // 粒子位置数组大小与 particleCount 保持一致
             const initialPositions = new Float32Array(particleCount * 3);
             const colors = new Float32Array(particleCount * 3);
-
             for (let i = 0; i < particleCount * 3; i++) {
                 initialPositions[i] = (Math.random() - 0.5) * 100;
                 colors[i] = 1.0; 
             }
-
             geometry.setAttribute('position', new THREE.BufferAttribute(initialPositions, 3));
             geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-            const textureLoader = new THREE.TextureLoader();
-            const circleSprite = textureLoader.load('https://threejs.org/examples/textures/sprites/disc.png'); 
-
+            const circleSprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png'); 
             material = new THREE.PointsMaterial({
-                size: 1.2, // 默认粒子大小设置为 1.2
-                map: circleSprite,
-                vertexColors: true,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                transparent: true,
-                opacity: 0.76 
+                size: 1.2, map: circleSprite, vertexColors: true, blending: THREE.AdditiveBlending,
+                depthWrite: false, transparent: true, opacity: 0.76 
             });
-
             particles = new THREE.Points(geometry, material);
             scene.add(particles);
         }
 
-        // --- 创建彗尾粒子系统 ---
         function createCometTailParticles() {
             cometTailGeometry = new THREE.BufferGeometry();
-            
             for (let i = 0; i < cometTailParticleCount * 3; i++) {
-                cometTailPositions[i] = 0; 
-                cometTailColors[i] = cometTailColor.r; 
+                cometTailPositions[i] = 0; cometTailColors[i] = cometTailColor.r; 
             }
             cometTailGeometry.setAttribute('position', new THREE.BufferAttribute(cometTailPositions, 3));
             cometTailGeometry.setAttribute('color', new THREE.BufferAttribute(cometTailColors, 3));
-
-            const textureLoader = new THREE.TextureLoader();
-            const circleSprite = textureLoader.load('https://threejs.org/examples/textures/sprites/disc.png'); 
-
+            const circleSprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png'); 
             cometTailMaterial = new THREE.PointsMaterial({
-                size: 2, // 彗尾大小从 4 减小到 2
-                map: circleSprite,
-                vertexColors: true,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                transparent: true,
-                opacity: 1.0 
+                size: 2, map: circleSprite, vertexColors: true, blending: THREE.AdditiveBlending,
+                depthWrite: false, transparent: true, opacity: 1.0 
             });
-
             cometTailParticles = new THREE.Points(cometTailGeometry, cometTailMaterial);
-            // 彗尾粒子现在只会在 initThree() 中被添加到 scene
         }
 
-
-        // --- GUI 设置 ---
         function initGUI() {
             const gui = new GUI({ container: document.getElementById('ui-container'), closed: true }); 
             const params = {
-                shape: 'saturn', 
-                color: '#d7a560',    
-                particleSize: 1.2, 
-                photoRotationSpeed: 0.005,
-                cometTailVisible: true,
-                // 重置相机功能的实现
+                shape: 'saturn', color: '#d7a560', particleSize: 1.2, 
                 resetCamera: () => {
-                    camera.position.set(0, 20, 100);
-                    camera.fov = 55;
-                    camera.updateProjectionMatrix();
-                    controls.target.set(0, 0, 0); // 将 OrbitControls 的目标点也重置到原点
-                    controls.update();
+                    camera.position.set(0, 20, 100); camera.fov = 55;
+                    camera.updateProjectionMatrix(); controls.target.set(0, 0, 0); controls.update();
                 }
             };
-            
-            const guiDomElement = gui.domElement;
-
-            guiDomElement.addEventListener('mousedown', (event) => {
-                event.stopPropagation();
-            }, false);
-            
-            guiDomElement.addEventListener('pointerdown', (event) => {
-                event.stopPropagation();
-            }, false);
-
-            // --- 相机设置 (新增) ---
-            const cameraFolder = gui.addFolder('相机设置 (Camera)');
-            cameraFolder.add(camera.position, 'x', -500, 500, 1).name('位置 X (Pos X)');
-            cameraFolder.add(camera.position, 'y', -500, 500, 1).name('位置 Y (Pos Y)');
-            cameraFolder.add(camera.position, 'z', -500, 500, 1).name('位置 Z (Pos Z)');
-            cameraFolder.add(camera, 'fov', 10, 100, 1).name('视野 (FOV)').onChange(() => {
-                camera.updateProjectionMatrix();
-            });
-            cameraFolder.add(params, 'resetCamera').name('重置视角 (Reset)');
-            cameraFolder.open(); // 默认打开方便调试
-
-
-            // --- 模型与粒子设置 (原有) ---
-            const particleFolder = gui.addFolder('模型与粒子设置 (Particles)');
-
-            particleFolder.add(params, 'shape', ['saturn', 'cubicHeart', 'flower', 'buddha', 'fireworks']).name('模型选择').onChange(val => {
+            gui.add(params, 'shape', ['saturn', 'cubicHeart', 'flower', 'buddha', 'fireworks']).name('模型选择').onChange(val => {
                 currentShape = val;
-
-                // --- 切换模式时刷新彗尾位置 ---
-                if (cometTailParticles) {
-                    cometTailPositions.fill(0); // 重置位置
-                    cometTailIndex = 0;
-                    cometTailParticles.geometry.attributes.position.needsUpdate = true;
-                }
-                
-                controls.autoRotate = true; 
-                controls.enabled = true;    
-                controls.autoRotateSpeed = originalAutoRotateSpeed;
-                
-                // 切换颜色主题
+                interactionState = STATE.IDLE; // 切换模型时重置交互状态
                 if(val === 'saturn') params.color = '#d7a560';
                 if(val === 'cubicHeart') params.color = '#ff69b4';
                 if(val === 'flower') params.color = '#ffcc00';
@@ -457,191 +429,178 @@
                 if(val === 'fireworks') params.color = '#ffffff';
                 targetColor.set(params.color);
             });
-
-            particleFolder.addColor(params, 'color').name('粒子颜色').onChange(val => {
-                targetColor.set(val);
-            });
-            
-            particleFolder.add(params, 'particleSize', 0.5, 5).name('粒子大小').onChange(val => {
-                material.size = val;
-            });
-
-            if (photoMesh) {
-                particleFolder.add(params, 'photoRotationSpeed', 0, 0.05).name('照片旋转速度').onChange(val => {
-                    photoMesh.rotationSpeed = val;
-                });
-                photoMesh.rotationSpeed = params.photoRotationSpeed;
-            }
-
-            particleFolder.add(params, 'cometTailVisible').name('彗尾可见').onChange(val => {
-                if (cometTailParticles) {
-                    cometTailParticles.visible = val;
-                }
-            });
+            gui.addColor(params, 'color').name('粒子颜色').onChange(val => targetColor.set(val));
+            gui.add(params, 'particleSize', 0.5, 5).name('粒子大小').onChange(val => material.size = val);
+            gui.add(params, 'resetCamera').name('重置视角');
         }
 
-        // --- 动画循环 ---
         function animate() {
             requestAnimationFrame(animate);
-            time += 0.01; // 增加时间，用于旋转和浮动
+            const dt = 0.016; 
+            time += 0.01; 
 
-            // 只有在非固定视角模式下才更新 OrbitControls
-            if (controls.enabled) {
-                controls.update();
+            if (controls.enabled) controls.update();
+
+            // --- 核心状态机逻辑 ---
+            const hintEl = document.getElementById('hint-text');
+
+            if (currentShape === 'saturn') {
+                // 1. IDLE 模式：检测悬停
+                if (interactionState === STATE.IDLE || interactionState === STATE.HOVERING) {
+                    
+                    // 计算彗尾到中心的距离 (XY平面投影)
+                    const dist = Math.sqrt(cometTailWorldPosition.x * cometTailWorldPosition.x + cometTailWorldPosition.y * cometTailWorldPosition.y);
+                    
+                    // 映射距离到环的索引 (近似范围)
+                    let hoveredRing = -1;
+                    if (dist > 40 && dist < 52) hoveredRing = 0;
+                    else if (dist >= 52 && dist < 62) hoveredRing = 1;
+                    else if (dist >= 62 && dist < 72) hoveredRing = 2;
+                    else if (dist >= 72 && dist < 82) hoveredRing = 3;
+                    else if (dist >= 82 && dist < 95) hoveredRing = 4;
+
+                    if (hoveredRing !== -1) {
+                        if (hoveredRing === activeRingIndex) {
+                            // 持续悬停在同一个环
+                            if (Date.now() - hoverStartTime > HOVER_THRESHOLD * 1000) {
+                                // 触发 FOCUSED 模式
+                                interactionState = STATE.FOCUSED;
+                                hintEl.innerText = "请张开或握紧手掌";
+                                hintEl.style.opacity = 1;
+                                setTimeout(() => hintEl.style.opacity = 0, 3000);
+                            }
+                        } else {
+                            // 切换到了新环，重置计时
+                            activeRingIndex = hoveredRing;
+                            hoverStartTime = Date.now();
+                            interactionState = STATE.HOVERING;
+                        }
+                    } else {
+                        // 没悬停在任何环
+                        interactionState = STATE.IDLE;
+                        activeRingIndex = -1;
+                    }
+                }
+
+                // 2. FOCUSED 模式：检测移动重置 + 手势交互
+                else if (interactionState === STATE.FOCUSED) {
+                    // 检测彗尾移动速度
+                    const movement = cometTailWorldPosition.distanceTo(lastCometPos);
+                    if (movement > MOVEMENT_SENSITIVITY) {
+                        if (movementStartTime === 0) movementStartTime = Date.now();
+                        else if (Date.now() - movementStartTime > RESET_THRESHOLD * 1000) {
+                            // 移动太久，重置回土星
+                            interactionState = STATE.IDLE;
+                            activeRingIndex = -1;
+                            movementStartTime = 0;
+                        }
+                    } else {
+                        movementStartTime = 0; // 停止移动，重置移动计时
+                    }
+                }
+            } else {
+                interactionState = STATE.IDLE; // 非土星模式不交互
+            }
+            
+            lastCometPos.copy(cometTailWorldPosition);
+
+            // --- 粒子目标位置确定 ---
+            const positions = particles.geometry.attributes.position.array;
+            const colors = particles.geometry.attributes.color.array;
+            
+            let currentTargetArr;
+            let currentTargetColor = targetColor;
+
+            // 根据状态选择目标形状
+            if (interactionState === STATE.FOCUSED && activeRingIndex !== -1) {
+                // 聚焦模式：根据手势决定是照片还是文字
+                if (handInteractionFactor > 0.6) {
+                    // 手掌张开 -> 情话 (文字)
+                    currentTargetArr = targets.ringTexts[activeRingIndex];
+                } else {
+                    // 手掌聚拢 (或默认) -> 照片
+                    currentTargetArr = targets.ringPhotos[activeRingIndex];
+                }
+                currentTargetColor = new THREE.Color(ringColors[activeRingIndex]); // 使用环对应的颜色
+            } else {
+                // 默认土星或其他形状
+                currentTargetArr = targets[currentShape];
             }
 
-            const positions = particles.geometry.attributes.position.array;
-            const targetArr = targets[currentShape];
-            const colors = particles.geometry.attributes.color.array;
-
-            let spreadMult = 1.0 + (handInteractionFactor * 1.5);
-
-            const isFireworks = currentShape === 'fireworks';
-            const speed = isFireworks ? 0.02 : 0.05;
-            
-            // 旋转和浮动参数
-            const rotationSpeed = 0.005; // 慢速旋转
-            const oscillationAmplitude = 1.5; // 垂直浮动幅度
-            const oscillationSpeed = 0.02;  // 垂直浮动速度
+            // --- 粒子更新循环 ---
+            const rotationSpeed = 0.005;
             const rotAngle = time * rotationSpeed;
             const cosRot = Math.cos(rotAngle);
             const sinRot = Math.sin(rotAngle);
+            const isFireworks = currentShape === 'fireworks';
+            const speed = isFireworks ? 0.02 : 0.05;
 
-            // --- 土星模式下的颜色配置 ---
+            // 土星颜色逻辑复用
             const coreCount = 15000; 
             const outerSatelliteCount = 500;
             const ringCount = particleCount - coreCount - outerSatelliteCount; 
             const groupSize = ringCount / 5; 
-            
             const ringStart = coreCount; 
             const outerSatelliteStart = coreCount + ringCount; 
+            const groupColors = [
+                new THREE.Color(0xffff00), new THREE.Color(0xff0000), 
+                new THREE.Color(0x0000ff), new THREE.Color(0x00ff00), 
+                new THREE.Color(0xffffff)
+            ];
 
-            // 卫星颜色定义 (固定颜色)
-            const coreGuiColor = targetColor;
-            const group1Color = new THREE.Color(0xffff00); // Yellow
-            const group2Color = new THREE.Color(0xff0000); // Red
-            const group3Color = new THREE.Color(0x0000ff); // Blue
-            const group4Color = new THREE.Color(0x00ff00); // Green
-            const group5Color = new THREE.Color(0xffffff); // White
-            const outerSatelliteColor = new THREE.Color(0xffa500); // Orange
-
-
-            // 主粒子更新
             for (let i = 0; i < particleCount; i++) {
                 const ix = i * 3;
-                const iy = i * 3 + 1;
-                const iz = i * 3 + 2;
+                let tx = currentTargetArr[ix];
+                let ty = currentTargetArr[ix+1];
+                let tz = currentTargetArr[ix+2];
 
-                let tx = targetArr[ix];
-                let ty = targetArr[iy];
-                let tz = targetArr[iz];
-                
-                // --- 1. Z轴上下旋转运动 (围绕Y轴旋转 + Y轴轻微上下浮动) ---
-                const original_x = targetArr[ix];
-                const original_z = targetArr[iz];
-                
-                // 应用 Y 轴旋转到目标位置 (X, Z 坐标变化)
-                tx = (original_x * cosRot - original_z * sinRot) * spreadMult;
-                tz = (original_x * sinRot + original_z * cosRot) * spreadMult;
-                
-                // 应用 Y 轴浮动到目标位置
-                ty = targetArr[iy] * spreadMult;
-                ty += Math.sin(time * oscillationSpeed + i * 0.1) * oscillationAmplitude;
-                
-                // --- 2. 动态目标颜色选择 ---
-                let currentTargetColor = coreGuiColor; 
-
-                if (currentShape === 'saturn') {
-                    if (i < ringStart) {
-                        // 核心 (球体)
-                        currentTargetColor = coreGuiColor;
-                    } else if (i < outerSatelliteStart) {
-                        // 5 卫星群 (星环)
-                        const particleIndexInRing = i - ringStart;
-                        const groupIndex = Math.floor(particleIndexInRing / groupSize);
-
-                        switch (groupIndex) {
-                            case 0: currentTargetColor = group1Color; break; // Yellow
-                            case 1: currentTargetColor = group2Color; break; // Red
-                            case 3: currentTargetColor = group4Color; break; // Green
-                            case 4: currentTargetColor = group5Color; break; // White
-                            case 2: default: currentTargetColor = group3Color; break; // Blue
-                        }
-                    } else {
-                        // 最外层卫星
-                        currentTargetColor = outerSatelliteColor;
-                    }
+                // 旋转逻辑 (仅在非聚焦模式下旋转，聚焦时文字需要正对)
+                if (interactionState !== STATE.FOCUSED) {
+                     const ox = tx; const oz = tz;
+                     tx = ox * cosRot - oz * sinRot;
+                     tz = ox * sinRot + oz * cosRot;
                 }
 
-                // --- 3. 末端粒子自动缓慢消失 (通过距离中心点变暗模拟) ---
-                const currentX = positions[ix];
-                const currentY = positions[iy];
-                const currentZ = positions[iz];
-                
-                // 计算粒子到原点的距离
-                const distance = Math.sqrt(currentX * currentX + currentY * currentY + currentZ * currentZ);
-                const maxFadeDistance = 50; 
-                const minFadeDistance = 30; // 粒子开始淡出的距离
-                
-                // 计算淡出进度 (0.0 到 1.0)
-                let fadeProgress = (distance - minFadeDistance) / (maxFadeDistance - minFadeDistance);
-                fadeProgress = Math.min(1, Math.max(0, fadeProgress)); 
-                
-                // 颜色强度 (1.0 到 0.1)
-                let colorIntensity = 1.0 - (fadeProgress * 0.9); 
-                
-                // 使用计算出的强度使目标颜色变暗
-                let dimmedTargetR = currentTargetColor.r * colorIntensity;
-                let dimmedTargetG = currentTargetColor.g * colorIntensity;
-                let dimmedTargetB = currentTargetColor.b * colorIntensity;
+                // 颜色逻辑
+                let pColor = currentTargetColor;
+                if (currentShape === 'saturn' && interactionState !== STATE.FOCUSED) {
+                    if (i < ringStart) pColor = targetColor;
+                    else if (i < outerSatelliteStart) {
+                        const gIdx = Math.floor((i - ringStart) / groupSize);
+                        if (gIdx < 5) pColor = groupColors[gIdx];
+                    } else pColor = new THREE.Color(0xffa500);
+                }
 
-
-                // 粒子位置插值
+                // 位置插值
                 positions[ix] += (tx - positions[ix]) * speed;
-                positions[iy] += (ty - positions[iy]) * speed;
-                positions[iz] += (tz - positions[iz]) * speed;
+                positions[ix+1] += (ty - positions[ix+1]) * speed;
+                positions[ix+2] += (tz - positions[ix+2]) * speed;
 
-                // 颜色插值（趋向于变暗的目标颜色）
-                colors[ix] += (dimmedTargetR - colors[ix]) * 0.05;
-                colors[iy] += (dimmedTargetG - colors[iy]) * 0.05;
-                colors[iz] += (dimmedTargetB - colors[iz]) * 0.05;
-
-
-                if(handInteractionFactor > 0.5) {
-                    positions[ix] += (Math.random()-0.5) * 0.5;
-                    positions[iy] += (Math.random()-0.5) * 0.5;
-                    positions[iz] += (Math.random()-0.5) * 0.5;
-                }
+                // 颜色插值
+                colors[ix] += (pColor.r - colors[ix]) * 0.05;
+                colors[ix+1] += (pColor.g - colors[ix+1]) * 0.05;
+                colors[ix+2] += (pColor.b - colors[ix+2]) * 0.05;
             }
 
             particles.geometry.attributes.position.needsUpdate = true;
             particles.geometry.attributes.color.needsUpdate = true;
-            
-            // --- 彗尾粒子衰减更新 (增强锐利度) ---
+
+            // 彗尾更新
             if (cometTailParticles && cometTailParticles.visible) {
                 const ctColors = cometTailParticles.geometry.attributes.color.array;
                 let headIndex = (cometTailIndex === 0) ? cometTailParticleCount - 1 : cometTailIndex - 1;
-
                 for (let i = 0; i < cometTailParticleCount; i++) {
                     let distance = (headIndex - i + cometTailParticleCount) % cometTailParticleCount;
-                    let normalizedDistance = distance / cometTailParticleCount; 
-                    
-                    // 使用更高的幂次（例如 6 次方），使头部非常锐利，拖尾更短
-                    const alpha = Math.pow(Math.max(0, 1 - normalizedDistance), 6); 
-                    
-                    ctColors[i * 3 + 0] = cometTailColor.r * alpha;
+                    let normDist = distance / cometTailParticleCount; 
+                    const alpha = Math.pow(Math.max(0, 1 - normDist), 6); 
+                    ctColors[i * 3] = cometTailColor.r * alpha;
                     ctColors[i * 3 + 1] = cometTailColor.g * alpha;
                     ctColors[i * 3 + 2] = cometTailColor.b * alpha;
                 }
                 cometTailParticles.geometry.attributes.color.needsUpdate = true;
             }
 
-
-            // 照片旋转
-            if (photoMesh) {
-                photoMesh.rotation.y += photoMesh.rotationSpeed || 0.005;
-            }
-
+            if (photoMesh) photoMesh.rotation.y += photoMesh.rotationSpeed || 0.005;
             renderer.render(scene, camera);
         }
 
@@ -651,90 +610,49 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // --- MediaPipe Hands 集成 ---
-        const videoElement = document.getElementsByClassName('input_video')[0];
-        
+        // --- MediaPipe Results ---
         function onResults(results) {
             document.getElementById('loading').style.display = 'none';
-            
             const numHands = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
-            const oneHandDetected = numHands === 1;
-
+            
             if (numHands > 0) {
-                const landmarks = results.multiHandLandmarks[0]; // 始终使用第一只手计算交互因子
-                
-                const index = landmarks[8]; // 食指尖
-                const middle = landmarks[12]; // 中指尖
-                const pinky = landmarks[20]; // 小指尖
+                const landmarks = results.multiHandLandmarks[0]; 
+                const index = landmarks[8]; 
+                const middle = landmarks[12]; 
+                const pinky = landmarks[20]; 
 
-                // --- 粒子扩散逻辑: 使用中指尖(12)和小指尖(20)的距离来判断手掌是否张开 ---
-                const spreadDistance = Math.sqrt(
-                    Math.pow(middle.x - pinky.x, 2) + 
-                    Math.pow(middle.y - pinky.y, 2)
-                );
-
-                // 将距离转换为 0 到 1 之间的因子。
-                // 阈值 0.1 以下视为并拢，0.35 以上视为完全张开
+                // 1. 计算手掌张开因子
+                const spreadDistance = Math.sqrt(Math.pow(middle.x - pinky.x, 2) + Math.pow(middle.y - pinky.y, 2));
                 let factor = (spreadDistance - 0.1) * 4; 
                 factor = Math.max(0, Math.min(1, factor));
-
                 handInteractionFactor += (factor - handInteractionFactor) * 0.1;
-                
-                // --- 彗尾控制逻辑 (仅在检测到一根手时触发) ---
-                if (oneHandDetected && cometTailParticles && cometTailParticles.visible) {
-                    
-                    // 1. 定义一个映射范围，使手部移动能够覆盖场景中心的一个区域
-                    // 范围从 40 扩大到 160，覆盖到土星最外环 (~80)
+
+                // 2. 彗尾位置更新
+                if (cometTailParticles && cometTailParticles.visible) {
                     const worldRange = 160; 
-                    
-                    // 2. 计算 X 轴世界坐标：(index.x - 0.5) 得到 -0.5 到 0.5 的偏移
-                    // X 轴：(index.x - 0.5) 得到 -0.5 到 0.5 的偏移，乘以 worldRange 得到最终的 X 位置 (正值向右)
                     const worldX = (index.x - 0.5) * worldRange; 
-                    
-                    // 3. 计算 Y 轴世界坐标：-(index.y - 0.5) 反转 Y 轴，使手指向上移动 (index.y 减小) 
-                    // 对应世界坐标的 Y 增加 (向上)
                     const worldY = -(index.y - 0.5) * worldRange; 
                     
-                    // 4. 设定彗尾的 3D 世界位置 (固定 Z = 0)
-                    // 由于 cometTailParticles 现在是 scene 的子对象，这个位置是相对于世界原点的。
-                    const cometTailWorldPosition = new THREE.Vector3(worldX, worldY, 0); 
-                    
-                    // 更新彗尾粒子位置 (循环覆盖旧粒子，形成拖尾)
-                    const ctPositions = cometTailParticles.geometry.attributes.position.array;
-                    ctPositions[cometTailIndex * 3] = cometTailWorldPosition.x;
-                    ctPositions[cometTailIndex * 3 + 1] = cometTailWorldPosition.y;
-                    ctPositions[cometTailIndex * 3 + 2] = cometTailWorldPosition.z;
+                    cometTailWorldPosition.set(worldX, worldY, 0); // 更新全局位置变量
 
-                    cometTailIndex = (cometTailIndex + 1) % cometTailParticleCount; // 循环更新索引
+                    // 写入缓冲区
+                    const ctPositions = cometTailParticles.geometry.attributes.position.array;
+                    ctPositions[cometTailIndex * 3] = worldX;
+                    ctPositions[cometTailIndex * 3 + 1] = worldY;
+                    ctPositions[cometTailIndex * 3 + 2] = 0;
+                    cometTailIndex = (cometTailIndex + 1) % cometTailParticleCount; 
                     cometTailParticles.geometry.attributes.position.needsUpdate = true;
                 }
-                
             } else {
-                // 如果没有手，交互因子逐渐归零
                 handInteractionFactor += (0 - handInteractionFactor) * 0.05;
             }
         }
 
-        const hands = new Hands({locateFile: (file) => {
-            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-        }});
-
-        hands.setOptions({
-            maxNumHands: 1, // 限制最多检测一只手，但我们会检查 results.multiHandLandmarks.length
-            modelComplexity: 1,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
-        });
-
+        const videoElement = document.getElementsByClassName('input_video')[0];
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         hands.onResults(onResults);
-
-        const cameraUtils = new Camera(videoElement, {
-            onFrame: async () => {
-                await hands.send({image: videoElement});
-            },
-            width: 320,
-            height: 240
-        });
+        const cameraUtils = new Camera(videoElement, { onFrame: async () => await hands.send({image: videoElement}), width: 320, height: 240 });
 
         initThree();
         cameraUtils.start();
