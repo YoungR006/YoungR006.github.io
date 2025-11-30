@@ -806,6 +806,7 @@
                 const openThreshold = 0.7;    // 手掌张开阈值 (散开)
 
                 if (handInteractionFactor < closureThreshold) {
+                    controls.autoRotate = true;
                     // ** 1. 手掌聚拢 (低因子) -> 聚集成字 (情话) **
                     currentTargetArr = targets.ringTexts[activeRingIndex];
                     targetOpacity = 1.0; // 成字时清晰度最高
@@ -835,6 +836,8 @@
                     hintEl.style.opacity = 1;
 
                 } else {
+
+                    camera.position.z = 400;
                     // ** 1. 手掌聚拢 (低因子) -> 聚集成字 (情话) **
                     currentTargetArr = targets.ringTexts[activeRingIndex];
                     targetOpacity = 1.0; // 成字时清晰度最高
@@ -1044,4 +1047,5 @@
     </script>
 </body>
 </html>
+
 
