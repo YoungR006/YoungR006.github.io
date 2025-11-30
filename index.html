@@ -70,6 +70,37 @@
             letter-spacing: 5px;
             z-index: 8;
         }
+
+        /* 返回按钮 */
+        #back-btn {
+            position: absolute;
+            bottom: 150px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 30px;
+            background: rgba(215, 165, 96, 0.3); /* 土星金色半透明 */
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            border-radius: 30px;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            transition: all 0.5s;
+            z-index: 15;
+            font-size: 18px;
+            letter-spacing: 2px;
+            opacity: 0;
+            pointer-events: none; /* 默认不可点击 */
+        }
+        #back-btn:hover {
+            background: rgba(215, 165, 96, 0.6);
+            transform: translateX(-50%) scale(1.05);
+        }
+        #back-btn.visible {
+            opacity: 1;
+            pointer-events: auto;
+            bottom: 80px; /* 动画浮现 */
+        }
+
     </style>
 </head>
 <body>
@@ -77,6 +108,9 @@
     <div id="loading">正在初始化摄像头与AI模型...<br><span style="font-size:14px; opacity:0.7">请允许摄像头权限</span></div>
     
     <div id="hint-text"></div>
+    
+    <!-- 新增返回按钮 -->
+    <button id="back-btn">⟲ 返回宇宙</button>
 
     <video class="input_video" playsinline></video>
     
@@ -114,7 +148,8 @@
             saturn: [],
             buddha: [],
             fireworks: [],
-            // 新增：5个环对应的照片和文字形状数据
+            galaxy: [], // 恢复的螺旋星系
+            // 5个环对应的照片和文字形状数据
             ringPhotos: [[], [], [], [], []],
             ringTexts: [[], [], [], [], []]
         };
@@ -122,6 +157,7 @@
         let currentShape = 'saturn'; 
         let handInteractionFactor = 0; // 0 (Closed) -> 1 (Open)
         let targetColor = new THREE.Color(0xd7a560); 
+        let baseOpacity = 0.76; // 基础透明度
         
         let photoMesh;
 
@@ -199,7 +235,24 @@
                 else document.exitFullscreen();
             });
 
+            // 绑定返回按钮事件
+            document.getElementById('back-btn').addEventListener('click', resetToUniverse);
+
             animate();
+        }
+
+        // --- 手动重置函数 ---
+        function resetToUniverse() {
+            interactionState = STATE.IDLE;
+            activeRingIndex = -1;
+            movementStartTime = 0;
+            
+            // 隐藏按钮
+            const btn = document.getElementById('back-btn');
+            btn.classList.remove('visible');
+            
+            // 恢复相机自动旋转
+            controls.autoRotate = true;
         }
 
         function loadPhotos() {
@@ -230,7 +283,7 @@
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            ctx.font = 'bold 80px "Microsoft YaHei", sans-serif'; // 使用粗体中文字体
+            ctx.font = 'bold 80px "Microsoft YaHei", sans-serif'; 
             ctx.fillStyle = '#ffffff';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -241,16 +294,11 @@
             const points = [];
             
             // 扫描像素
-            for(let y=0; y<canvas.height; y+=2) { // 步长2以减少点数
+            for(let y=0; y<canvas.height; y+=2) { 
                 for(let x=0; x<canvas.width; x+=2) {
                     const index = (y * canvas.width + x) * 4;
-                    if(data[index] > 128) { // 如果是白色像素
-                        // 将2D坐标映射到3D空间
-                        points.push(
-                            (x - canvas.width/2) * 0.5, // x
-                            (canvas.height/2 - y) * 0.5, // y (反转)
-                            0 // z
-                        );
+                    if(data[index] > 128) { 
+                        points.push((x - canvas.width/2) * 0.5, (canvas.height/2 - y) * 0.5, 0);
                     }
                 }
             }
@@ -260,7 +308,7 @@
         // --- 辅助：生成矩形照片粒子坐标 ---
         function createRectParticles(width, height) {
             const points = [];
-            const stepsX = 140; // 密度
+            const stepsX = 140; 
             const stepsY = 140;
             for (let i = 0; i < stepsX; i++) {
                 for (let j = 0; j < stepsY; j++) {
@@ -277,7 +325,6 @@
             for (let i = 0; i < 5; i++) {
                 // 1. 生成文字形状
                 const textPoints = createStringParticles(loveWords[i]);
-                // 填充到40000个点，循环使用
                 const textTarget = [];
                 for(let k=0; k<particleCount; k++) {
                     const pIndex = (k % (textPoints.length/3)) * 3;
@@ -286,11 +333,10 @@
                 targets.ringTexts[i] = textTarget;
 
                 // 2. 生成照片形状 (矩形)
-                const photoPoints = createRectParticles(80, 60); // 宽80 高60
+                const photoPoints = createRectParticles(80, 60); 
                 const photoTarget = [];
                 for(let k=0; k<particleCount; k++) {
                      const pIndex = (k % (photoPoints.length/3)) * 3;
-                     // 稍微加一点Z轴随机性，让照片看起来有厚度
                      photoTarget.push(photoPoints[pIndex], photoPoints[pIndex+1], photoPoints[pIndex+2] + (Math.random()-0.5)*2);
                 }
                 targets.ringPhotos[i] = photoTarget;
@@ -309,7 +355,6 @@
             const outerSatelliteStart = coreCount + ringCount;
 
             for (let i = 0; i < particleCount; i++) {
-                // ... (Cubic Heart, Flower 逻辑保持不变，略) ...
                 // 1. Cubic Heart
                 let x, y, z, t;
                 t = Math.random() * Math.PI * 2;
@@ -325,7 +370,7 @@
                 tempVec.setFromSphericalCoords(radius_f, f_phi, f_theta);
                 targets.flower.push(tempVec.x, tempVec.y, tempVec.z);
 
-                // 3. Saturn (核心 + 5环 + 外环)
+                // 3. Saturn
                 if (i < ringStart) {
                     const phi = Math.acos(-1 + (2 * i) / ringStart);
                     const theta = Math.sqrt(ringStart * Math.PI) * phi;
@@ -372,6 +417,29 @@
                 // 5. Fireworks
                 tempVec.randomDirection().multiplyScalar(50 + Math.random() * 150);
                 targets.fireworks.push(tempVec.x, tempVec.y, tempVec.z);
+
+                // 6. 恢复：漩涡宇宙 (Galaxy Swirl)
+                // 使用对数螺旋生成
+                const arms = 5;
+                const armPoints = particleCount / arms;
+                const spinFactor = 0.5; // 旋转紧密度
+                const armIndex = i % arms;
+                const pointInArm = Math.floor(i / arms) / (particleCount / arms); // 0 to 1
+                
+                // 距离中心的距离 (增加随机性使边缘扩散)
+                const distance = pointInArm * 70 + 5; 
+                // 角度
+                const angleGalaxy = pointInArm * Math.PI * 2 * 3 + (armIndex * Math.PI * 2 / arms) + spinFactor / distance;
+                
+                const randomX = (Math.random()-0.5) * pointInArm * 20;
+                const randomY = (Math.random()-0.5) * pointInArm * 10;
+                const randomZ = (Math.random()-0.5) * pointInArm * 20;
+
+                targets.galaxy.push(
+                    Math.cos(angleGalaxy) * distance + randomX,
+                    (Math.random()-0.5) * (15 - distance * 0.1) + randomY, // 中心厚边缘薄
+                    Math.sin(angleGalaxy) * distance + randomZ
+                );
             }
         }
 
@@ -389,7 +457,7 @@
             const circleSprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png'); 
             material = new THREE.PointsMaterial({
                 size: 1.2, map: circleSprite, vertexColors: true, blending: THREE.AdditiveBlending,
-                depthWrite: false, transparent: true, opacity: 0.76 
+                depthWrite: false, transparent: true, opacity: baseOpacity 
             });
             particles = new THREE.Points(geometry, material);
             scene.add(particles);
@@ -419,10 +487,13 @@
                     camera.updateProjectionMatrix(); controls.target.set(0, 0, 0); controls.update();
                 }
             };
-            gui.add(params, 'shape', ['saturn', 'cubicHeart', 'flower', 'buddha', 'fireworks']).name('模型选择').onChange(val => {
+            // 重新添加 galaxy 选项
+            gui.add(params, 'shape', ['saturn', 'galaxy', 'cubicHeart', 'flower', 'buddha', 'fireworks']).name('模型选择').onChange(val => {
                 currentShape = val;
-                interactionState = STATE.IDLE; // 切换模型时重置交互状态
+                resetToUniverse(); // 切换模型时强制重置
+                
                 if(val === 'saturn') params.color = '#d7a560';
+                if(val === 'galaxy') params.color = '#aa00ff';
                 if(val === 'cubicHeart') params.color = '#ff69b4';
                 if(val === 'flower') params.color = '#ffcc00';
                 if(val === 'buddha') params.color = '#00ffff';
@@ -443,6 +514,7 @@
 
             // --- 核心状态机逻辑 ---
             const hintEl = document.getElementById('hint-text');
+            const backBtn = document.getElementById('back-btn');
 
             if (currentShape === 'saturn') {
                 // 1. IDLE 模式：检测悬停
@@ -465,9 +537,15 @@
                             if (Date.now() - hoverStartTime > HOVER_THRESHOLD * 1000) {
                                 // 触发 FOCUSED 模式
                                 interactionState = STATE.FOCUSED;
+                                controls.autoRotate = false; // 停止自动旋转方便查看
+                                
+                                // 显示交互提示
                                 hintEl.innerText = "请张开或握紧手掌";
                                 hintEl.style.opacity = 1;
                                 setTimeout(() => hintEl.style.opacity = 0, 3000);
+                                
+                                // 显示返回按钮
+                                backBtn.classList.add('visible');
                             }
                         } else {
                             // 切换到了新环，重置计时
@@ -490,9 +568,7 @@
                         if (movementStartTime === 0) movementStartTime = Date.now();
                         else if (Date.now() - movementStartTime > RESET_THRESHOLD * 1000) {
                             // 移动太久，重置回土星
-                            interactionState = STATE.IDLE;
-                            activeRingIndex = -1;
-                            movementStartTime = 0;
+                            resetToUniverse();
                         }
                     } else {
                         movementStartTime = 0; // 停止移动，重置移动计时
@@ -510,22 +586,32 @@
             
             let currentTargetArr;
             let currentTargetColor = targetColor;
+            let targetOpacity = baseOpacity; // 目标透明度
 
             // 根据状态选择目标形状
             if (interactionState === STATE.FOCUSED && activeRingIndex !== -1) {
                 // 聚焦模式：根据手势决定是照片还是文字
                 if (handInteractionFactor > 0.6) {
-                    // 手掌张开 -> 情话 (文字)
+                    // ** 手掌张开 -> 情话 (文字) **
                     currentTargetArr = targets.ringTexts[activeRingIndex];
+                    targetOpacity = 1.0; // 文字完全不透明
                 } else {
-                    // 手掌聚拢 (或默认) -> 照片
+                    // ** 手掌聚拢 (或默认) -> 照片 **
                     currentTargetArr = targets.ringPhotos[activeRingIndex];
+                    // 褪色逻辑：聚拢时(handInteractionFactor小)透明度趋向于0
+                    // 为了让聚拢过程可见，我们使用一个较慢的插值或让它在完全聚拢后才非常淡
+                    // 这里设置为：手越紧(factor越小)，透明度越低，直到完全消失
+                    targetOpacity = Math.max(0, handInteractionFactor * 2 - 0.2); 
                 }
                 currentTargetColor = new THREE.Color(ringColors[activeRingIndex]); // 使用环对应的颜色
             } else {
                 // 默认土星或其他形状
                 currentTargetArr = targets[currentShape];
+                targetOpacity = baseOpacity;
             }
+            
+            // 平滑更新透明度
+            material.opacity += (targetOpacity - material.opacity) * 0.05;
 
             // --- 粒子更新循环 ---
             const rotationSpeed = 0.005;
