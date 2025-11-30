@@ -825,6 +825,7 @@
 
                 } else if (handInteractionFactor >= openThreshold) {
                     // ** 2. 手掌张开 (高因子) -> 散开流星 **
+                    camera.position.z = 100;
                     currentTargetArr = targets.fireworks; // 复用 fireworks 散射目标
                     targetOpacity = 0.7; // 散开时稍微透明
                     
@@ -1047,5 +1048,6 @@
     </script>
 </body>
 </html>
+
 
 
