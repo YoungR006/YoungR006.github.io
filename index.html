@@ -72,10 +72,10 @@
             z-index: 8;
         }
 
-        /* 返回按钮 */
+        /* 返回按钮 - 核心修改：默认可见并常驻 */
         #back-btn {
             position: absolute;
-            bottom: 150px;
+            bottom: 80px; /* 常驻位置 */
             left: 50%;
             transform: translateX(-50%);
             padding: 12px 30px;
@@ -89,18 +89,16 @@
             z-index: 15;
             font-size: 18px;
             letter-spacing: 2px;
-            opacity: 0;
-            pointer-events: none; /* 默认不可点击 */
+            
+            /* 默认可见且可点击 */
+            opacity: 1;
+            pointer-events: auto;
         }
         #back-btn:hover {
             background: rgba(255, 0, 127, 0.6);
             transform: translateX(-50%) scale(1.05);
         }
-        #back-btn.visible {
-            opacity: 1;
-            pointer-events: auto;
-            bottom: 80px; /* 动画浮现 */
-        }
+        /* 移除 .visible 样式，因为不再需要控制显隐 */
 
     </style>
 </head>
@@ -110,7 +108,6 @@
     
     <div id="hint-text"></div>
     
-    <!-- 新增返回按钮 -->
     <button id="back-btn">⟲ 返回宇宙</button>
 
     <video class="input_video" playsinline></video>
@@ -270,15 +267,15 @@
             animate();
         }
 
-        // --- 手动重置函数 ---
+        // --- 手动重置函数 - 移除隐藏按钮的逻辑，使其常驻 ---
         function resetToUniverse() {
             interactionState = STATE.IDLE;
             activeRingIndex = -1;
             movementStartTime = 0;
             
-            // 隐藏按钮
-            const btn = document.getElementById('back-btn');
-            btn.classList.remove('visible');
+            // 移除以下代码，使按钮常驻：
+            // const btn = document.getElementById('back-btn');
+            // btn.classList.remove('visible'); 
             
             // 恢复相机自动旋转和 FOV
             controls.autoRotate = true;
@@ -701,7 +698,7 @@
 
             // --- 核心状态机逻辑 ---
             const hintEl = document.getElementById('hint-text');
-            const backBtn = document.getElementById('back-btn');
+            const backBtn = document.getElementById('back-btn'); // 按钮现在常驻，不需要显隐控制
             
             // 流星显示控制 (只有在土星模型或特殊聚焦模式下才显示和更新流星)
             if (meteorParticles && meteorParticles.visible) updateMeteorShower(dt);
@@ -739,8 +736,8 @@
                                 hintEl.style.opacity = 1;
                                 setTimeout(() => hintEl.style.opacity = 0, 3000);
                                 
-                                // 显示返回按钮
-                                backBtn.classList.add('visible');
+                                // 移除显示返回按钮的代码 (现在常驻)
+                                // backBtn.classList.add('visible');
                             }
                         } else {
                             // 切换到了新环，重置计时
@@ -1046,8 +1043,3 @@
     </script>
 </body>
 </html>
-
-
-
-
-
