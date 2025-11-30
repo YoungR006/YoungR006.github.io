@@ -148,7 +148,7 @@
             saturn: [],
             buddha: [],
             fireworks: [],
-            galaxy: [], // 恢复的螺旋星系
+            galaxy: [], 
             // 5个环对应的照片和文字形状数据
             ringPhotos: [[], [], [], [], []],
             ringTexts: [[], [], [], [], []]
@@ -259,6 +259,7 @@
 
         function loadPhotos() {
             const textureLoader = new THREE.TextureLoader();
+            // 使用占位符图片链接，方便测试
             const frontTexture = textureLoader.load('https://placehold.co/1000x1000/362E4F/ffffff?text=Photo+Front'); 
             const backTexture = textureLoader.load('https://placehold.co/1000x1000/2E364F/ffffff?text=Photo+Back');
             const photoGeometry = new THREE.PlaneGeometry(30, 30);
@@ -626,8 +627,8 @@
                 targetOpacity = baseOpacity;
             }
             
-            // 平滑更新透明度
-            material.opacity += (targetOpacity - material.opacity) * 0.05;
+            // 颜色和透明度过渡速度从 0.05 提升到 0.1
+            material.opacity += (targetOpacity - material.opacity) * 0.1;
 
             // --- 粒子更新循环 ---
             const rotationSpeed = 0.005;
@@ -635,7 +636,9 @@
             const cosRot = Math.cos(rotAngle);
             const sinRot = Math.sin(rotAngle);
             const isFireworks = currentShape === 'fireworks';
-            const speed = isFireworks ? 0.02 : 0.05;
+            
+            // 粒子运动速度从 0.05 提升到 0.1
+            const speed = isFireworks ? 0.02 : 0.1; 
 
             // 土星颜色逻辑复用
             const coreCount = 15000; 
@@ -695,7 +698,7 @@
             particles.geometry.attributes.color.needsUpdate = true;
 
             // 彗尾更新
-            if (cometTailParticles && cometTailParticles.visible) {
+            if (cometTailParticles) {
                 const ctColors = cometTailParticles.geometry.attributes.color.array;
                 let headIndex = (cometTailIndex === 0) ? cometTailParticleCount - 1 : cometTailIndex - 1;
                 for (let i = 0; i < cometTailParticleCount; i++) {
@@ -737,18 +740,21 @@
                 handInteractionFactor += (factor - handInteractionFactor) * 0.1;
 
                 // 2. 彗尾位置更新
-                if (cometTailParticles && cometTailParticles.visible) {
+                if (cometTailParticles) {
                     const worldRange = 160; 
-                    const worldX = (index.x - 0.5) * worldRange; 
+                    
+                    // *** 修正: 反转 X 轴映射方向，使彗尾运动方向与镜像视频一致 ***
+                    const worldX = -(index.x - 0.5) * worldRange; 
                     const worldY = -(index.y - 0.5) * worldRange; 
                     
                     cometTailWorldPosition.set(worldX, worldY, 0); // 更新全局位置变量
 
-                    // 写入缓冲区
+                    // 写入缓冲区 (Z=0, 保持在屏幕平面)
                     const ctPositions = cometTailParticles.geometry.attributes.position.array;
                     ctPositions[cometTailIndex * 3] = worldX;
                     ctPositions[cometTailIndex * 3 + 1] = worldY;
-                    ctPositions[cometTailIndex * 3 + 2] = 0;
+                    ctPositions[cometTailIndex * 3 + 2] = 0; // 保持 Z 为 0
+                    
                     cometTailIndex = (cometTailIndex + 1) % cometTailParticleCount; 
                     cometTailParticles.geometry.attributes.position.needsUpdate = true;
                 }
