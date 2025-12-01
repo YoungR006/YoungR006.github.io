@@ -563,7 +563,7 @@
         function initGUI() {
             const gui = new GUI({ 
                 container: document.getElementById('ui-container'), 
-                title: '浪漫宇宙控制台', 
+                title: '控制台', 
                 closed: false 
             }); 
             
@@ -678,7 +678,7 @@
                                 interactionState = STATE.FOCUSED;
                                 controls.autoRotate = false; 
                                 
-                                hintEl.innerText = "比2:杨瑞智 | 比3:爱心 | 比4:杨雅淇";
+                                hintEl.innerText = "比2 | 比3 | 比4";
                                 hintEl.style.opacity = 1;
                                 setTimeout(() => hintEl.style.opacity = 0, 5000);
                             }
@@ -974,3 +974,4 @@
     </script>
 </body>
 </html>
+
