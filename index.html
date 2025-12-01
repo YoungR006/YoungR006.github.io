@@ -5,70 +5,133 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>宝宝永远开心</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; user-select: none; }
         canvas { display: block; }
         
+        /* --- 调试控制台 (默认隐藏) --- */
         #ui-container {
             position: absolute;
             top: 20px;
             left: 20px;
-            z-index: 10;
+            z-index: 100;
+            display: none; /* 默认隐藏，按 K 键显示 */
         }
         
-        .input_video {
+        /* --- 全新的顶部模型切换 UI --- */
+        #model-menu {
             position: absolute;
-            bottom: 10px;
-            right: 10px;
-            width: 160px;
-            height: 120px;
-            border-radius: 8px;
-            border: 2px solid rgba(255,255,255,0.3);
-            transform: scaleX(-1);
-            opacity: 0.7;
-            z-index: 5;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 50;
+            display: flex;
+            gap: 12px;
+            padding: 10px 25px;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(12px);
+            border-radius: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            flex-wrap: wrap;
+            justify-content: center;
+            width: max-content;
+            max-width: 90vw;
+            transition: opacity 0.3s;
         }
 
+        .model-btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.8);
+            padding: 6px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: 1px;
+        }
+
+        .model-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .model-btn.active {
+            background: rgba(255, 0, 127, 0.6); /* 激活色：洋红 */
+            border-color: rgba(255, 0, 127, 0.8);
+            color: white;
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.4);
+            font-weight: bold;
+        }
+
+        /* 摄像头小窗 */
+        .input_video {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 160px;
+            height: 120px;
+            border-radius: 12px;
+            border: 2px solid rgba(255,255,255,0.2);
+            transform: scaleX(-1);
+            opacity: 0.6;
+            z-index: 5;
+            transition: opacity 0.3s;
+        }
+        .input_video:hover { opacity: 1; }
+
+        /* 全屏按钮 */
         #fullscreen-btn {
             position: absolute;
             bottom: 20px;
             left: 20px;
-            padding: 10px 20px;
+            width: 40px;
+            height: 40px;
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             color: white;
-            border-radius: 30px;
+            border-radius: 50%;
             cursor: pointer;
             backdrop-filter: blur(5px);
             transition: all 0.3s;
             z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
         }
-        #fullscreen-btn:hover { background: rgba(255, 255, 255, 0.3); }
+        #fullscreen-btn:hover { background: rgba(255, 255, 255, 0.3); transform: scale(1.1); }
 
         #loading {
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             color: white;
-            font-size: 24px;
+            font-size: 18px;
             text-align: center;
             pointer-events: none;
+            line-height: 1.6;
         }
         
         /* 交互提示文字 */
         #hint-text {
             position: absolute;
-            top: 50%;
+            top: 55%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: rgba(255,255,255,0.8);
-            font-size: 32px;
+            color: rgba(255,255,255,0.9);
+            font-size: 28px;
             font-weight: bold;
             pointer-events: none;
             opacity: 0;
-            transition: opacity 1s;
-            text-shadow: 0 0 10px rgba(0,0,0,0.5);
-            letter-spacing: 5px;
+            transition: opacity 0.8s;
+            text-shadow: 0 0 15px rgba(0,0,0,0.8);
+            letter-spacing: 4px;
             z-index: 8;
+            width: 100%;
+            text-align: center;
         }
 
         /* 返回按钮 */
@@ -77,38 +140,55 @@
             bottom: 80px; 
             left: 50%;
             transform: translateX(-50%);
-            padding: 12px 30px;
-            background: rgba(255, 0, 127, 0.3); 
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            color: white;
+            padding: 10px 24px;
+            background: rgba(255, 255, 255, 0.1); 
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.9);
             border-radius: 30px;
             cursor: pointer;
             backdrop-filter: blur(8px);
-            transition: all 0.5s;
+            transition: all 0.4s;
             z-index: 15;
-            font-size: 18px;
+            font-size: 16px;
             letter-spacing: 2px;
             opacity: 1;
             pointer-events: auto;
         }
         #back-btn:hover {
-            background: rgba(255, 0, 127, 0.6);
-            transform: translateX(-50%) scale(1.05);
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            #model-menu {
+                top: 10px;
+                padding: 8px 15px;
+                gap: 8px;
+                width: 90%;
+            }
+            .model-btn {
+                font-size: 12px;
+                padding: 5px 12px;
+            }
+            #hint-text { font-size: 20px; }
         }
     </style>
 </head>
 <body>
 
-    <div id="loading">正在初始化摄像头与AI模型...<br><span style="font-size:14px; opacity:0.7">请允许摄像头权限</span></div>
+    <div id="loading">正在初始化摄像头与AI模型...<br><span style="font-size:12px; opacity:0.6">首次加载可能较慢，请允许摄像头权限</span></div>
     
     <div id="hint-text"></div>
     
-    <button id="back-btn">⟲ 返回宇宙</button>
+    <div id="model-menu"></div>
 
-    <video class="input_video" playsinline></video>
+    <button id="back-btn">⟲ 重置视角</button>
+    <button id="fullscreen-btn" title="全屏">⛶</button>
     
-    <button id="fullscreen-btn">⛶ 全屏模式</button>
     <div id="ui-container"></div>
+    
+    <video class="input_video" playsinline></video>
 
     <script type="importmap">
         {
@@ -147,22 +227,31 @@
             infinity: [], 
             ringPhotos: [], 
             ringTexts: [],
-            nameYangR: [], // 杨瑞智
-            nameYangY: []  // 杨雅淇
+            nameYangR: [], 
+            nameYangY: []  
         };
         
+        // 模型定义数据 (用于生成UI)
+        const models = [
+            { id: 'saturn', name: '🪐 土星', color: '#ff007f' },
+            { id: 'infinity', name: '♾️ 无限', color: '#ff007f' },
+            { id: 'galaxy', name: '🌌 星系', color: '#9370db' },
+            { id: 'cubicHeart', name: '💖 爱心', color: '#ff69b4' },
+            { id: 'flower', name: '🌻 繁花', color: '#ffcc00' },
+            { id: 'buddha', name: '🧘 禅', color: '#00ffff' },
+            { id: 'fireworks', name: '✨ 烟花', color: '#ffffff' }
+        ];
+
         let currentShape = 'saturn'; 
         let handInteractionFactor = 0; 
         let prevHandInteractionFactor = 0; 
         let targetColor = new THREE.Color(0xff007f); 
         let baseOpacity = 0.76; 
         
-        // --- 手势数字状态 ---
         let detectedFingerCount = 0; 
-
         let photoMesh; 
 
-        // --- 彗尾粒子系统 ---
+        // 彗尾
         const cometTailParticleCount = 40; 
         let cometTailParticles, cometTailGeometry, cometTailMaterial;
         const cometTailPositions = new Float32Array(cometTailParticleCount * 3);
@@ -171,7 +260,7 @@
         const cometTailColor = new THREE.Color(0xffa500); 
         let cometTailWorldPosition = new THREE.Vector3(); 
 
-        // --- 流星粒子系统 ---
+        // 流星
         let meteorParticles, meteorGeometry, meteorMaterial;
         const meteorCount = 500; 
         const meteorAttributes = {
@@ -181,12 +270,8 @@
             maxLifespans: new Float32Array(meteorCount)
         };
 
-        // --- 交互状态 ---
-        const STATE = {
-            IDLE: 0,      
-            HOVERING: 1,  
-            FOCUSED: 2    
-        };
+        // 状态机
+        const STATE = { IDLE: 0, HOVERING: 1, FOCUSED: 2 };
         let interactionState = STATE.IDLE;
         let activeRingIndex = -1; 
         
@@ -201,7 +286,7 @@
         const loveWords = ["❤12.7❤", "无限的爱意", "星河长明", "与你同行", "爱如繁星"];
         const ringColors = [0xffa500, 0xff007f, 0x9370db, 0x00ffff, 0xffffff]; 
 
-        // --- 初始化 ---
+        // --- 初始化入口 ---
         function initThree() {
             const container = document.createElement('div');
             document.body.appendChild(container);
@@ -233,14 +318,14 @@
             loadPhotos(); 
             generateShapes();
             generateInteractionShapes(); 
-
             createParticles();
             createCometTailParticles(); 
             createMeteorShower(); 
-            
             scene.add(cometTailParticles); 
             
-            initGUI();
+            // 初始化 UI
+            initCustomUI();
+            initDebugGUI(); // 原 GUI 作为调试用
             
             window.addEventListener('resize', onWindowResize);
             document.getElementById('fullscreen-btn').addEventListener('click', () => {
@@ -249,19 +334,88 @@
             });
 
             document.getElementById('back-btn').addEventListener('click', resetToUniverse);
+            
+            // 添加按键监听：'K' 键控制调试面板
+            window.addEventListener('keydown', (e) => {
+                if(e.key === 'k' || e.key === 'K') {
+                    const uiContainer = document.getElementById('ui-container');
+                    if(uiContainer.style.display === 'none' || uiContainer.style.display === '') {
+                        uiContainer.style.display = 'block';
+                        console.log("Debug UI Enabled");
+                    } else {
+                        uiContainer.style.display = 'none';
+                        console.log("Debug UI Disabled");
+                    }
+                }
+            });
 
             animate();
+        }
+
+        // --- 初始化自定义 UI ---
+        function initCustomUI() {
+            const menuContainer = document.getElementById('model-menu');
+            
+            models.forEach(model => {
+                const btn = document.createElement('button');
+                btn.className = 'model-btn';
+                btn.innerText = model.name;
+                if(model.id === currentShape) btn.classList.add('active');
+                
+                btn.onclick = () => {
+                    // 更新激活状态
+                    document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    // 切换模型逻辑
+                    currentShape = model.id;
+                    targetColor.set(model.color);
+                    resetToUniverse(); // 切换模型时自动重置视角和状态
+                };
+                
+                menuContainer.appendChild(btn);
+            });
+        }
+
+        // --- 初始化调试 GUI (隐藏) ---
+        function initDebugGUI() {
+            const gui = new GUI({ 
+                container: document.getElementById('ui-container'), 
+                title: '调试控制台 (按K隐藏)', 
+                closed: false 
+            }); 
+            
+            const params = {
+                particleSize: 1.1,
+                resetCamera: () => {
+                    camera.position.set(0, 80, 120); 
+                    camera.fov = DEFAULT_FOV;
+                    camera.updateProjectionMatrix(); 
+                    controls.target.set(0, 0, 0); 
+                    controls.update();
+                }
+            };
+            
+            // 移除了模型选择，保留参数调整
+            const debugFolder = gui.addFolder('参数调试');
+            debugFolder.add(params, 'particleSize', 0.5, 5).name('粒子大小').onChange(val => material.size = val);
+            debugFolder.addColor({ color: '#' + targetColor.getHexString() }, 'color').name('强制颜色').onChange(val => targetColor.set(val));
+            
+            const cameraFolder = gui.addFolder('视角参数');
+            cameraFolder.add(camera.position, 'x', -200, 200).listen();
+            cameraFolder.add(camera.position, 'y', -200, 200).listen();
+            cameraFolder.add(camera.position, 'z', 0, 400).listen();
+            cameraFolder.add(camera, 'fov', 10, 120).onChange(() => camera.updateProjectionMatrix()).listen();
+            cameraFolder.add(params, 'resetCamera').name('重置视角');
         }
 
         function resetToUniverse() {
             interactionState = STATE.IDLE;
             activeRingIndex = -1;
             movementStartTime = 0;
-            
             controls.autoRotate = true;
             camera.fov = DEFAULT_FOV; 
             camera.updateProjectionMatrix(); 
-            
             if (meteorParticles) meteorParticles.visible = false;
         }
 
@@ -286,26 +440,16 @@
         function createStringParticles(text) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            canvas.width = 400; 
-            canvas.height = 200;
-            
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
+            canvas.width = 400; canvas.height = 200;
+            ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.font = 'bold 80px "Microsoft YaHei", sans-serif'; 
-            ctx.fillStyle = '#ffffff';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(text, canvas.width/2, canvas.height/2);
-            
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageData.data;
+            const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
             const points = [];
-            
             for(let y=0; y<canvas.height; y+=2) { 
                 for(let x=0; x<canvas.width; x+=2) {
-                    const index = (y * canvas.width + x) * 4;
-                    if(data[index] > 128) { 
+                    if(data[(y * canvas.width + x) * 4] > 128) { 
                         points.push((x - canvas.width/2) * 0.5, (canvas.height/2 - y) * 0.5, 0);
                     }
                 }
@@ -315,20 +459,16 @@
 
         function createRectParticles(width, height) {
             const points = [];
-            const stepsX = 140; 
-            const stepsY = 140;
+            const stepsX = 140; const stepsY = 140;
             for (let i = 0; i < stepsX; i++) {
                 for (let j = 0; j < stepsY; j++) {
-                    const x = (i / stepsX - 0.5) * width;
-                    const y = (j / stepsY - 0.5) * height;
-                    points.push(x, y, 0);
+                    points.push((i / stepsX - 0.5) * width, (j / stepsY - 0.5) * height, 0);
                 }
             }
             return points;
         }
 
         function generateInteractionShapes() {
-            // 1. 现有环文字和照片形状
             for (let i = 0; i < 5; i++) {
                 const textPoints = createStringParticles(loveWords[i]);
                 const textTarget = [];
@@ -346,8 +486,6 @@
                 }
                 targets.ringPhotos.push(photoTarget);
             }
-
-            // --- 特殊名字目标 ---
             const createNameTarget = (name, targetArray) => {
                 const points = createStringParticles(name);
                 for(let k=0; k<particleCount; k++) {
@@ -361,24 +499,22 @@
 
         function generateShapes() {
             const tempVec = new THREE.Vector3();
-
             for (let i = 0; i < particleCount; i++) {
-                // 1. Cubic Heart
-                let x, y, z, t;
-                t = Math.random() * Math.PI * 2;
-                x = 16 * Math.pow(Math.sin(t), 3);
-                y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
-                z = (Math.random() - 0.5) * 20;
+                // Cubic Heart
+                let t = Math.random() * Math.PI * 2;
+                let x = 16 * Math.pow(Math.sin(t), 3);
+                let y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+                let z = (Math.random() - 0.5) * 20;
                 targets.cubicHeart.push(x * 1.5, y * 1.5, z);
 
-                // 2. Flower
+                // Flower
                 const f_theta = Math.random() * Math.PI * 2;
                 const f_phi = Math.random() * Math.PI;
                 const radius_f = 40 * Math.sin(3 * f_theta) * Math.sin(f_phi) + 15;
                 tempVec.setFromSphericalCoords(radius_f, f_phi, f_theta);
                 targets.flower.push(tempVec.x, tempVec.y, tempVec.z);
 
-                // 3. Saturn
+                // Saturn
                 const coreCount = 15000;
                 const outerSatelliteCount = 500;
                 const ringAndSatelliteCount = particleCount - coreCount;
@@ -391,8 +527,7 @@
                     const theta = Math.sqrt(ringStart * Math.PI) * phi;
                     tempVec.setFromSphericalCoords(35, phi, theta);
                     targets.saturn.push(tempVec.x, tempVec.y, tempVec.z);
-                } 
-                else if (i < outerSatelliteStart) {
+                } else if (i < outerSatelliteStart) {
                     const particleIndexInRing = i - ringStart; 
                     let angle = Math.random() * Math.PI * 2;
                     let dist = 0;
@@ -400,7 +535,6 @@
                     const baseRadius = 45;
                     const groupSpacing = 10.0; 
                     let groupIndex = Math.floor(particleIndexInRing / groupSize);
-
                     switch (groupIndex) {
                         case 0: dist = baseRadius + Math.random() * 2; break;
                         case 1: dist = baseRadius + groupSpacing * 1 + Math.random() * 3; y_offset=(Math.random()-0.5)*6; break;
@@ -410,14 +544,13 @@
                         default: dist = 60;
                     }
                     targets.saturn.push(Math.cos(angle) * dist, y_offset, Math.sin(angle) * dist);
-                }
-                else {
+                } else {
                     const angle = Math.random() * Math.PI * 2;
                     const dist = 90 + Math.random() * 10; 
                     targets.saturn.push(Math.cos(angle) * dist, (Math.random()-0.5)*8, Math.sin(angle) * dist);
                 }
 
-                // 4. Buddha
+                // Buddha
                 if (i < particleCount * 0.15) {
                     tempVec.randomDirection().multiplyScalar(8).add(new THREE.Vector3(0, 18, 0));
                     targets.buddha.push(tempVec.x, tempVec.y, tempVec.z);
@@ -429,34 +562,27 @@
                     targets.buddha.push(Math.cos(ang)*r, -8+Math.random()*5, Math.sin(ang)*r*0.8);
                 }
 
-                // 5. Fireworks
+                // Fireworks
                 tempVec.randomDirection().multiplyScalar(50 + Math.random() * 150);
                 targets.fireworks.push(tempVec.x, tempVec.y, tempVec.z);
 
-                // 6. Galaxy
+                // Galaxy
                 const arms = 5;
-                const armPoints = particleCount / arms;
-                const spinFactor = 0.5; 
-                const armIndex = i % arms;
                 const pointInArm = Math.floor(i / arms) / (particleCount / arms); 
                 const distance = pointInArm * 70 + 5; 
-                const angleGalaxy = pointInArm * Math.PI * 2 * 3 + (armIndex * Math.PI * 2 / arms) + spinFactor / distance;
-                const randomX = (Math.random()-0.5) * pointInArm * 20;
-                const randomY = (Math.random()-0.5) * pointInArm * 10;
-                const randomZ = (Math.random()-0.5) * pointInArm * 20;
+                const angleGalaxy = pointInArm * Math.PI * 2 * 3 + ((i % arms) * Math.PI * 2 / arms) + 0.5 / distance;
                 targets.galaxy.push(
-                    Math.cos(angleGalaxy) * distance + randomX,
-                    (Math.random()-0.5) * (15 - distance * 0.1) + randomY, 
-                    Math.sin(angleGalaxy) * distance + randomZ
+                    Math.cos(angleGalaxy) * distance + (Math.random()-0.5) * pointInArm * 20,
+                    (Math.random()-0.5) * (15 - distance * 0.1) + (Math.random()-0.5) * pointInArm * 10, 
+                    Math.sin(angleGalaxy) * distance + (Math.random()-0.5) * pointInArm * 20
                 );
 
-                // 7. Infinity
+                // Infinity
                 const inf_t = (i / particleCount) * Math.PI * 4; 
-                const inf_a = 35;
                 const inf_denom = 1 + Math.sin(inf_t) * Math.sin(inf_t);
                 targets.infinity.push(
-                    inf_a * Math.cos(inf_t) / inf_denom,
-                    inf_a * Math.sin(inf_t) * Math.cos(inf_t) / inf_denom,
+                    35 * Math.cos(inf_t) / inf_denom,
+                    35 * Math.sin(inf_t) * Math.cos(inf_t) / inf_denom,
                     (Math.random() - 0.5) * 5 
                 );
             }
@@ -475,13 +601,8 @@
 
             const circleSprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png'); 
             material = new THREE.PointsMaterial({
-                size: 1.1, 
-                map: circleSprite, 
-                vertexColors: true, 
-                blending: THREE.AdditiveBlending, 
-                depthWrite: false, 
-                transparent: true, 
-                opacity: baseOpacity 
+                size: 1.1, map: circleSprite, vertexColors: true, blending: THREE.AdditiveBlending, 
+                depthWrite: false, transparent: true, opacity: baseOpacity 
             });
             particles = new THREE.Points(geometry, material);
             scene.add(particles);
@@ -489,20 +610,13 @@
 
         function createCometTailParticles() {
             cometTailGeometry = new THREE.BufferGeometry();
-            for (let i = 0; i < cometTailParticleCount * 3; i++) {
-                cometTailPositions[i] = 0; cometTailColors[i] = cometTailColor.r; 
-            }
+            for (let i = 0; i < cometTailParticleCount * 3; i++) { cometTailPositions[i] = 0; cometTailColors[i] = cometTailColor.r; }
             cometTailGeometry.setAttribute('position', new THREE.BufferAttribute(cometTailPositions, 3));
             cometTailGeometry.setAttribute('color', new THREE.BufferAttribute(cometTailColors, 3));
             const circleSprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png'); 
             cometTailMaterial = new THREE.PointsMaterial({
-                size: 3, 
-                map: circleSprite, 
-                vertexColors: true, 
-                blending: THREE.AdditiveBlending,
-                depthWrite: false, 
-                transparent: true, 
-                opacity: 0.9 
+                size: 3, map: circleSprite, vertexColors: true, blending: THREE.AdditiveBlending,
+                depthWrite: false, transparent: true, opacity: 0.9 
             });
             cometTailParticles = new THREE.Points(cometTailGeometry, cometTailMaterial);
         }
@@ -510,25 +624,16 @@
         function createMeteorShower() {
             meteorGeometry = new THREE.BufferGeometry();
             const initialSizes = new Float32Array(meteorCount); 
-            
             meteorGeometry.setAttribute('position', new THREE.BufferAttribute(meteorAttributes.positions, 3));
             meteorGeometry.setAttribute('size', new THREE.BufferAttribute(initialSizes, 1)); 
-
             const starSprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png');
             meteorMaterial = new THREE.PointsMaterial({
-                size: 2.0, 
-                map: starSprite,
-                color: 0x99ccff, 
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                transparent: true,
-                sizeAttenuation: true 
+                size: 2.0, map: starSprite, color: 0x99ccff, blending: THREE.AdditiveBlending,
+                depthWrite: false, transparent: true, sizeAttenuation: true 
             });
-
             meteorParticles = new THREE.Points(meteorGeometry, meteorMaterial);
             meteorParticles.visible = false; 
             scene.add(meteorParticles);
-            
             for (let i = 0; i < meteorCount; i++) {
                 meteorAttributes.velocities.push(new THREE.Vector3());
                 meteorGeometry.attributes.size.array[i] = 0.0; 
@@ -538,132 +643,46 @@
         
         function resetMeteor(i) {
             const i3 = i * 3;
-            const pos = meteorAttributes.positions;
-            const vel = meteorAttributes.velocities[i];
-            
-            pos[i3] = (Math.random() - 0.5) * 400; 
-            pos[i3 + 1] = (Math.random() - 0.5) * 50; 
-            pos[i3 + 2] = -200 - Math.random() * 50; 
-            
-            const speed = 100 + Math.random() * 100; 
-            vel.set(
-                (Math.random() - 0.5) * 10, 
-                (Math.random() - 0.5) * 5,  
-                speed 
-            );
-            
+            meteorAttributes.positions[i3] = (Math.random() - 0.5) * 400; 
+            meteorAttributes.positions[i3 + 1] = (Math.random() - 0.5) * 50; 
+            meteorAttributes.positions[i3 + 2] = -200 - Math.random() * 50; 
+            meteorAttributes.velocities[i].set((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 5, 100 + Math.random() * 100);
             const maxLife = 4.0 + Math.random() * 2.0; 
             meteorAttributes.maxLifespans[i] = maxLife;
             meteorAttributes.lifespans[i] = maxLife;
-            
             meteorGeometry.attributes.size.array[i] = 0.0;
         }
 
-        function initGUI() {
-            const gui = new GUI({ 
-                container: document.getElementById('ui-container'), 
-                title: '浪漫宇宙控制台', 
-                closed: false 
-            }); 
-            
-            const params = {
-                shape: currentShape, 
-                color: '#ff007f', 
-                particleSize: 1.1, 
-                resetCamera: () => {
-                    camera.position.set(0, 80, 120); 
-                    camera.fov = DEFAULT_FOV;
-                    camera.updateProjectionMatrix(); 
-                    controls.target.set(0, 0, 0); 
-                    controls.update();
-                }
-            };
-            
-            const modelFolder = gui.addFolder('模型与风格');
-            modelFolder.add(params, 'shape', ['saturn', 'infinity', 'galaxy', 'cubicHeart', 'flower', 'buddha', 'fireworks']).name('模型选择').onChange(val => {
-                currentShape = val;
-                resetToUniverse();
-                
-                if(val === 'saturn') params.color = '#ff007f';
-                if(val === 'galaxy') params.color = '#9370db';
-                if(val === 'infinity') params.color = '#ff007f';
-                if(val === 'cubicHeart') params.color = '#ff69b4';
-                if(val === 'flower') params.color = '#ffcc00';
-                if(val === 'buddha') params.color = '#00ffff';
-                if(val === 'fireworks') params.color = '#ffffff';
-                targetColor.set(params.color);
-            });
-            modelFolder.addColor(params, 'color').name('粒子颜色').onChange(val => targetColor.set(val));
-            modelFolder.add(params, 'particleSize', 0.5, 5).name('粒子大小').onChange(val => material.size = val);
-            
-            const cameraFolder = gui.addFolder('视角调试');
-            cameraFolder.add(camera.position, 'x', -200, 200).step(1).name('Camera X').listen();
-            cameraFolder.add(camera.position, 'y', -200, 200).step(1).name('Camera Y').listen();
-            cameraFolder.add(camera.position, 'z', 0, 400).step(1).name('Camera Z').listen();
-            cameraFolder.add(camera, 'fov', 10, 120).step(1).name('FOV').onChange(() => {
-                camera.updateProjectionMatrix();
-            }).listen();
-            cameraFolder.add(params, 'resetCamera').name('重置视角');
-        }
-        
         function updateMeteorShower(dt) {
             if (meteorParticles.visible === false) return;
-
             const positions = meteorParticles.geometry.attributes.position.array;
             const sizes = meteorParticles.geometry.attributes.size.array; 
-
             for (let i = 0; i < meteorCount; i++) {
                 const i3 = i * 3;
                 meteorAttributes.lifespans[i] -= dt;
-                
-                if (meteorAttributes.lifespans[i] < 0 || positions[i3+2] > 200) {
-                    resetMeteor(i);
-                }
-
+                if (meteorAttributes.lifespans[i] < 0 || positions[i3+2] > 200) resetMeteor(i);
                 const vel = meteorAttributes.velocities[i];
-                positions[i3] += vel.x * dt;
-                positions[i3 + 1] += vel.y * dt;
-                positions[i3 + 2] += vel.z * dt;
-
-                const life = meteorAttributes.lifespans[i];
-                const maxLife = meteorAttributes.maxLifespans[i];
-                const normalizedLife = life / maxLife; 
-                
-                let sizeFactor;
-                if (normalizedLife > 0.8) { 
-                    sizeFactor = (1 - normalizedLife) * 5; 
-                } else if (normalizedLife < 0.2) { 
-                    sizeFactor = normalizedLife * 5;
-                } else {
-                    sizeFactor = 1.0;
-                }
-                sizes[i] = sizeFactor * 3.0; 
+                positions[i3] += vel.x * dt; positions[i3 + 1] += vel.y * dt; positions[i3 + 2] += vel.z * dt;
+                const normalizedLife = meteorAttributes.lifespans[i] / meteorAttributes.maxLifespans[i]; 
+                sizes[i] = (normalizedLife > 0.8 ? (1 - normalizedLife) * 5 : (normalizedLife < 0.2 ? normalizedLife * 5 : 1.0)) * 3.0;
             }
-            
             meteorParticles.geometry.attributes.position.needsUpdate = true;
             meteorParticles.geometry.attributes.size.needsUpdate = true;
         }
-
 
         function animate() {
             requestAnimationFrame(animate);
             const dt = 0.016; 
             time += 0.01; 
-
             if (controls.enabled) controls.update();
-
             const hintEl = document.getElementById('hint-text');
-            const backBtn = document.getElementById('back-btn'); 
             
             if (meteorParticles && meteorParticles.visible) updateMeteorShower(dt);
 
             if (currentShape === 'saturn') {
                 if (interactionState === STATE.IDLE || interactionState === STATE.HOVERING) {
-                    
                     if(meteorParticles && meteorParticles.visible) meteorParticles.visible = false; 
-
                     const distXZ = Math.sqrt(cometTailWorldPosition.x * cometTailWorldPosition.x + cometTailWorldPosition.z * cometTailWorldPosition.z);
-
                     let hoveredRing = -1;
                     if (distXZ > 40 && distXZ < 52) hoveredRing = 0;
                     else if (distXZ >= 52 && distXZ < 62) hoveredRing = 1;
@@ -676,7 +695,6 @@
                             if (Date.now() - hoverStartTime > HOVER_THRESHOLD * 1000) {
                                 interactionState = STATE.FOCUSED;
                                 controls.autoRotate = false; 
-                                
                                 hintEl.innerText = "比2:杨瑞智 | 比3:爱心 | 比4:杨雅淇 | 比5:流星";
                                 hintEl.style.opacity = 1;
                                 setTimeout(() => hintEl.style.opacity = 0, 5000);
@@ -690,31 +708,24 @@
                         interactionState = STATE.IDLE;
                         activeRingIndex = -1;
                     }
-                }
-
-                else if (interactionState === STATE.FOCUSED) {
+                } else if (interactionState === STATE.FOCUSED) {
                     const isGesturing = Math.abs(handInteractionFactor - prevHandInteractionFactor) > 0.01;
                     const movement = cometTailWorldPosition.distanceTo(lastCometPos);
-                    
                     if (!isGesturing && movement > MOVEMENT_SENSITIVITY) {
                         if (movementStartTime === 0) movementStartTime = Date.now();
-                        else if (Date.now() - movementStartTime > RESET_THRESHOLD * 1000) {
-                            resetToUniverse();
-                        }
+                        else if (Date.now() - movementStartTime > RESET_THRESHOLD * 1000) resetToUniverse();
                     } else {
                         movementStartTime = 0; 
                     }
                 }
             } else {
-                interactionState = STATE.IDLE; 
-                activeRingIndex = -1; 
+                interactionState = STATE.IDLE; activeRingIndex = -1; 
                 if(meteorParticles) meteorParticles.visible = false; 
             }
             
             lastCometPos.copy(cometTailWorldPosition);
             prevHandInteractionFactor = handInteractionFactor; 
 
-            // --- 粒子目标位置确定 ---
             const positions = particles.geometry.attributes.position.array;
             const colors = particles.geometry.attributes.color.array;
             
@@ -722,69 +733,35 @@
             let currentTargetColor = targetColor;
             let targetOpacity = baseOpacity; 
 
-            // 根据状态选择目标形状
             if (interactionState === STATE.FOCUSED && activeRingIndex !== -1) {
-                
-                // --- 逻辑核心：全部基于 detectedFingerCount ---
-                
                 if (detectedFingerCount === 5) {
-                    // 比出 5 -> 流星散开
-                     controls.autoRotate = true;
-                    camera.position.x = 0;
-                    camera.position.y = 0;
-                    camera.position.z = 100;
-                    currentTargetArr = targets.fireworks; 
-                    targetOpacity = 0.7; 
+                    controls.autoRotate = true; camera.position.set(0,0,100);
+                    currentTargetArr = targets.fireworks; targetOpacity = 0.7; 
                     if(meteorParticles) meteorParticles.visible = true;
-                    hintEl.innerText = "⭐流星⭐";
-                    hintEl.style.opacity = 1;
-                }
-                else if (detectedFingerCount === 4) {
-                    // 比出 4 -> 显示 "杨雅淇"
-                    camera.position.set(0, 0, 400); // 确保看文字时位置对正
-                    currentTargetArr = targets.nameYangY;
-                    targetOpacity = 1.0;
-                    if(meteorParticles) meteorParticles.visible = false;
-                    hintEl.innerText = "杨雅淇";
-                    hintEl.style.opacity = 1;
-                }
-                else if (detectedFingerCount === 3) {
-                    // 比出 3 -> 显示 爱心
+                    hintEl.innerText = "⭐ 散作流星 ⭐"; hintEl.style.opacity = 1;
+                } else if (detectedFingerCount === 4) {
                     camera.position.set(0, 0, 400);
-                    currentTargetArr = targets.cubicHeart;
-                    targetOpacity = 1.0;
+                    currentTargetArr = targets.nameYangY; targetOpacity = 1.0;
                     if(meteorParticles) meteorParticles.visible = false;
-                    hintEl.innerText = "❤️";
-                    hintEl.style.opacity = 1;
-                }
-                else if (detectedFingerCount === 2) {
-                    // 比出 2 -> 显示 "杨瑞智"
+                    hintEl.innerText = "杨雅淇"; hintEl.style.opacity = 1;
+                } else if (detectedFingerCount === 3) {
                     camera.position.set(0, 0, 400);
-                    currentTargetArr = targets.nameYangR;
-                    targetOpacity = 1.0;
+                    currentTargetArr = targets.cubicHeart; targetOpacity = 1.0;
                     if(meteorParticles) meteorParticles.visible = false;
-                    hintEl.innerText = "杨瑞智";
-                    hintEl.style.opacity = 1;
-                }
-                else {
-                    // --- 默认（握拳/比1）：聚合为环对应的文字 ---
-                    camera.position.x = 0;
-                    camera.position.y = 0;
-                    camera.position.z = 400;
-                    currentTargetArr = targets.ringTexts[activeRingIndex];
-                    targetOpacity = 1.0; 
+                    hintEl.innerText = "❤️"; hintEl.style.opacity = 1;
+                } else if (detectedFingerCount === 2) {
+                    camera.position.set(0, 0, 400);
+                    currentTargetArr = targets.nameYangR; targetOpacity = 1.0;
                     if(meteorParticles) meteorParticles.visible = false;
-                    
-                    hintEl.innerText = loveWords[activeRingIndex];
-                    hintEl.style.opacity = 1;
-                    // 自动隐藏提示
-                    if (Date.now() - hoverStartTime > 4000) { 
-                         if(hintEl.style.opacity > 0) hintEl.style.opacity -= 0.01;
-                    }
+                    hintEl.innerText = "杨瑞智"; hintEl.style.opacity = 1;
+                } else {
+                    camera.position.set(0, 0, 400);
+                    currentTargetArr = targets.ringTexts[activeRingIndex]; targetOpacity = 1.0; 
+                    if(meteorParticles) meteorParticles.visible = false;
+                    hintEl.innerText = loveWords[activeRingIndex]; hintEl.style.opacity = 1;
+                    if (Date.now() - hoverStartTime > 4000 && hintEl.style.opacity > 0) hintEl.style.opacity -= 0.01;
                 }
-                
                 currentTargetColor = new THREE.Color(ringColors[activeRingIndex]); 
-                
             } else {
                 currentTargetArr = targets[currentShape];
                 targetOpacity = baseOpacity;
@@ -792,48 +769,28 @@
             }
             
             material.opacity += (targetOpacity - material.opacity) * 0.1;
-
-            const rotationSpeed = 0.005;
-            const rotAngle = time * rotationSpeed;
+            const rotAngle = time * 0.005;
             const cosRot = Math.cos(rotAngle);
             const sinRot = Math.sin(rotAngle);
-            const isFireworks = currentShape === 'fireworks';
+            const speed = (currentShape === 'fireworks') ? 0.02 : 0.1; 
             
-            const speed = isFireworks ? 0.02 : 0.1; 
-
-            const coreCount = 15000; 
-            const outerSatelliteCount = 500;
-            const ringCount = particleCount - coreCount - outerSatelliteCount; 
-            const groupSize = ringCount / 5; 
-            const ringStart = coreCount; 
-            const outerSatelliteStart = coreCount + ringCount; 
-            const groupColors = [
-                new THREE.Color(0xffa500), new THREE.Color(0xff007f), 
-                new THREE.Color(0x9370db), new THREE.Color(0x00ffff), 
-                new THREE.Color(0xffffff)
-            ];
+            // Satrun Colors
+            const groupColors = [new THREE.Color(0xffa500), new THREE.Color(0xff007f), new THREE.Color(0x9370db), new THREE.Color(0x00ffff), new THREE.Color(0xffffff)];
 
             for (let i = 0; i < particleCount; i++) {
                 const ix = i * 3;
-                let tx = currentTargetArr[ix];
-                let ty = currentTargetArr[ix+1];
-                let tz = currentTargetArr[ix+2];
+                let tx = currentTargetArr[ix]; let ty = currentTargetArr[ix+1]; let tz = currentTargetArr[ix+2];
 
-                if (interactionState !== STATE.FOCUSED) {
-                    if (currentShape === 'infinity' || currentShape === 'cubicHeart' || currentShape === 'saturn') {
-                        const ox = tx; const oz = tz;
-                        tx = ox * cosRot - oz * sinRot;
-                        tz = ox * sinRot + oz * cosRot;
-                    }
-                } else if (currentShape === 'saturn') {
-                   // 聚焦不旋转
+                if (interactionState !== STATE.FOCUSED && ['infinity','cubicHeart','saturn'].includes(currentShape)) {
+                    const ox = tx; const oz = tz;
+                    tx = ox * cosRot - oz * sinRot; tz = ox * sinRot + oz * cosRot;
                 }
 
                 let pColor = currentTargetColor;
                 if (currentShape === 'saturn' && interactionState !== STATE.FOCUSED) {
-                    if (i < ringStart) pColor = targetColor;
-                    else if (i < outerSatelliteStart) {
-                        const gIdx = Math.floor((i - ringStart) / groupSize);
+                    if (i < 15000) pColor = targetColor;
+                    else if (i < 15000 + (particleCount-15000-500)) {
+                        const gIdx = Math.floor((i - 15000) / ((particleCount-15500)/5));
                         if (gIdx < 5) pColor = groupColors[gIdx];
                     } else pColor = new THREE.Color(0xffa500);
                 }
@@ -841,7 +798,6 @@
                 positions[ix] += (tx - positions[ix]) * speed;
                 positions[ix+1] += (ty - positions[ix+1]) * speed;
                 positions[ix+2] += (tz - positions[ix+2]) * speed;
-
                 colors[ix] += (pColor.r - colors[ix]) * 0.05;
                 colors[ix+1] += (pColor.g - colors[ix+1]) * 0.05;
                 colors[ix+2] += (pColor.b - colors[ix+2]) * 0.05;
@@ -855,16 +811,13 @@
                 let headIndex = (cometTailIndex === 0) ? cometTailParticleCount - 1 : cometTailIndex - 1;
                 for (let i = 0; i < cometTailParticleCount; i++) {
                     let distance = (headIndex - i + cometTailParticleCount) % cometTailParticleCount;
-                    let normDist = distance / cometTailParticleCount; 
-                    const alpha = Math.pow(Math.max(0, 1 - normDist), 8); 
-                    
+                    const alpha = Math.pow(Math.max(0, 1 - distance / cometTailParticleCount), 8); 
                     ctColors[i * 3] = cometTailColor.r + (1 - cometTailColor.r) * alpha; 
                     ctColors[i * 3 + 1] = cometTailColor.g + (1 - cometTailColor.g) * alpha;
                     ctColors[i * 3 + 2] = cometTailColor.b + (1 - cometTailColor.b) * alpha;
                 }
                 cometTailParticles.geometry.attributes.color.needsUpdate = true;
             }
-
             if (photoMesh) photoMesh.rotation.y += photoMesh.rotationSpeed || 0.005;
             renderer.render(scene, camera);
         }
@@ -875,79 +828,46 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // --- MediaPipe Results ---
         function onResults(results) {
             document.getElementById('loading').style.display = 'none';
             const numHands = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
-            
             if (numHands > 0) {
                 const landmarks = results.multiHandLandmarks[0]; 
-                
-                // 保留旧的 factor 计算，以防万一需要平滑过渡
-                const index = landmarks[8]; 
-                const middle = landmarks[12]; 
-                const pinky = landmarks[20]; 
-
-                const D_tips = Math.sqrt(Math.pow(middle.x - pinky.x, 2) + Math.pow(middle.y - pinky.y, 2));
-                const p0 = landmarks[0]; 
-                const p5 = landmarks[5]; 
-                const D_norm = Math.sqrt(
-                    Math.pow(p0.x - p5.x, 2) + 
-                    Math.pow(p0.y - p5.y, 2) + 
-                    Math.pow(p0.z - p5.z, 2)
-                ) * 1.5; 
-
-                let factor = D_tips / D_norm; 
-                factor = Math.max(0, Math.min(1, factor * 2)); 
+                const p0 = landmarks[0]; const p5 = landmarks[5]; 
+                const D_norm = Math.sqrt(Math.pow(p0.x - p5.x, 2) + Math.pow(p0.y - p5.y, 2)) * 1.5; 
+                // Hand Open Factor
+                const D_tips = Math.sqrt(Math.pow(landmarks[12].x - landmarks[20].x, 2) + Math.pow(landmarks[12].y - landmarks[20].y, 2));
+                let factor = D_tips / D_norm; factor = Math.max(0, Math.min(1, factor * 2)); 
                 handInteractionFactor += (factor - handInteractionFactor) * 0.1; 
-
-                // --- 核心：数手指逻辑 (增加大拇指支持) ---
+                // Finger Counting
                 const isFingerUp = (tipIdx, pipIdx) => {
                     const dTip = Math.sqrt(Math.pow(landmarks[tipIdx].x - landmarks[0].x, 2) + Math.pow(landmarks[tipIdx].y - landmarks[0].y, 2));
                     const dPip = Math.sqrt(Math.pow(landmarks[pipIdx].x - landmarks[0].x, 2) + Math.pow(landmarks[pipIdx].y - landmarks[0].y, 2));
                     return dTip > dPip * 1.1; 
                 };
-
                 let count = 0;
-                // 拇指判断：使用 Tip 到 MCP 的距离 与 IP 到 MCP 的距离对比，或者简单地用距离手腕的长度
-                // 这里为了简单，使用与手指相同的逻辑（指尖距离手腕 > 关节距离手腕）
-                if (isFingerUp(4, 2)) count++;   // 拇指
-                if (isFingerUp(8, 6)) count++;   // 食指
-                if (isFingerUp(12, 10)) count++; // 中指
-                if (isFingerUp(16, 14)) count++; // 无名指
-                if (isFingerUp(20, 18)) count++; // 小指
-                
+                if (isFingerUp(4, 2)) count++; // Thumb
+                if (isFingerUp(8, 6)) count++; // Index
+                if (isFingerUp(12, 10)) count++; // Middle
+                if (isFingerUp(16, 14)) count++; // Ring
+                if (isFingerUp(20, 18)) count++; // Pinky
                 detectedFingerCount = count;
 
-                // --- 彗尾位置更新 ---
                 if (cometTailParticles) {
-                    const worldRangeX = 160; 
-                    const worldRangeY = 120;
-                    
-                    const worldX = -(index.x - 0.5) * worldRangeX; 
-                    const worldY = -(index.y - 0.5) * worldRangeY; 
-                    const worldZ = (index.z - 0.5) * 40; 
-
+                    const worldX = -(landmarks[8].x - 0.5) * 160; 
+                    const worldY = -(landmarks[8].y - 0.5) * 120; 
+                    const worldZ = (landmarks[8].z - 0.5) * 40; 
                     cometTailWorldPosition.set(worldX, worldY, worldZ); 
-
                     const ctPositions = cometTailParticles.geometry.attributes.position.array;
-                    ctPositions[cometTailIndex * 3] = worldX;
-                    ctPositions[cometTailIndex * 3 + 1] = worldY;
-                    ctPositions[cometTailIndex * 3 + 2] = worldZ; 
-                    
+                    ctPositions[cometTailIndex * 3] = worldX; ctPositions[cometTailIndex * 3 + 1] = worldY; ctPositions[cometTailIndex * 3 + 2] = worldZ; 
                     cometTailIndex = (cometTailIndex + 1) % cometTailParticleCount; 
                     cometTailParticles.geometry.attributes.position.needsUpdate = true;
                 }
             } else {
-                handInteractionFactor += (0 - handInteractionFactor) * 0.05;
-                detectedFingerCount = 0; 
-
+                handInteractionFactor += (0 - handInteractionFactor) * 0.05; detectedFingerCount = 0; 
                 if (cometTailParticles) {
                     const ctPositions = cometTailParticles.geometry.attributes.position.array;
-                    for(let i = 0; i < cometTailParticleCount * 3; i += 3) {
-                        ctPositions[i+2] += 0.5;
-                        ctPositions[i+1] -= 0.1; 
-                    }
+                    for(let i = 0; i < cometTailParticleCount * 3; i += 3) { ctPositions[i+2] += 0.5; ctPositions[i+1] -= 0.1; }
                     cometTailParticles.geometry.attributes.position.needsUpdate = true;
                 }
             }
@@ -965,4 +885,3 @@
     </script>
 </body>
 </html>
-
