@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>瑞❤淇</title>
+    <title>宝宝永远开心</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; }
@@ -147,7 +147,6 @@
             infinity: [], 
             ringPhotos: [], 
             ringTexts: [],
-            // --- 新增：特殊名字目标 ---
             nameYangR: [], // 杨瑞智
             nameYangY: []  // 杨雅淇
         };
@@ -158,12 +157,12 @@
         let targetColor = new THREE.Color(0xff007f); 
         let baseOpacity = 0.76; 
         
-        // --- 新增：手势数字状态 ---
+        // --- 手势数字状态 ---
         let detectedFingerCount = 0; 
 
         let photoMesh; 
 
-        // --- 彗尾粒子系统变量 ---
+        // --- 彗尾粒子系统 ---
         const cometTailParticleCount = 40; 
         let cometTailParticles, cometTailGeometry, cometTailMaterial;
         const cometTailPositions = new Float32Array(cometTailParticleCount * 3);
@@ -172,7 +171,7 @@
         const cometTailColor = new THREE.Color(0xffa500); 
         let cometTailWorldPosition = new THREE.Vector3(); 
 
-        // --- 流星粒子系统变量 ---
+        // --- 流星粒子系统 ---
         let meteorParticles, meteorGeometry, meteorMaterial;
         const meteorCount = 500; 
         const meteorAttributes = {
@@ -182,7 +181,7 @@
             maxLifespans: new Float32Array(meteorCount)
         };
 
-        // --- 交互状态管理变量 ---
+        // --- 交互状态 ---
         const STATE = {
             IDLE: 0,      
             HOVERING: 1,  
@@ -202,7 +201,7 @@
         const loveWords = ["12.7 纪念日快乐", "无限的爱意", "星河长明", "与你同行", "爱如繁星"];
         const ringColors = [0xffa500, 0xff007f, 0x9370db, 0x00ffff, 0xffffff]; 
 
-        // --- 初始化 Three.js ---
+        // --- 初始化 ---
         function initThree() {
             const container = document.createElement('div');
             document.body.appendChild(container);
@@ -348,7 +347,7 @@
                 targets.ringPhotos.push(photoTarget);
             }
 
-            // --- 新增：生成“杨瑞智”和“杨雅淇”的粒子形状 ---
+            // --- 特殊名字目标 ---
             const createNameTarget = (name, targetArray) => {
                 const points = createStringParticles(name);
                 for(let k=0; k<particleCount; k++) {
@@ -563,7 +562,7 @@
         function initGUI() {
             const gui = new GUI({ 
                 container: document.getElementById('ui-container'), 
-                title: '控制台', 
+                title: '浪漫宇宙控制台', 
                 closed: false 
             }); 
             
@@ -678,7 +677,7 @@
                                 interactionState = STATE.FOCUSED;
                                 controls.autoRotate = false; 
                                 
-                                hintEl.innerText = "比2 | 比3 | 比4";
+                                hintEl.innerText = "比2:杨瑞智 | 比3:爱心 | 比4:杨雅淇 | 比5:流星";
                                 hintEl.style.opacity = 1;
                                 setTimeout(() => hintEl.style.opacity = 0, 5000);
                             }
@@ -726,70 +725,61 @@
             // 根据状态选择目标形状
             if (interactionState === STATE.FOCUSED && activeRingIndex !== -1) {
                 
-                // --- 修改的核心：检测手势数字 (2, 3, 4) ---
-                if (detectedFingerCount === 2) {
-                    // 比出二 -> 显示 "杨瑞智"
-                    currentTargetArr = targets.nameYangR;
-                    targetOpacity = 1.0;
-                    if(meteorParticles) meteorParticles.visible = false;
-                    hintEl.innerText = "杨瑞智";
-                    hintEl.style.opacity = 1;
-                } 
-                else if (detectedFingerCount === 3) {
-                    // 比出三 -> 显示 爱心
-                    currentTargetArr = targets.cubicHeart;
-                    targetOpacity = 1.0;
-                    if(meteorParticles) meteorParticles.visible = false;
-                    hintEl.innerText = "❤️";
+                // --- 逻辑核心：全部基于 detectedFingerCount ---
+                
+                if (detectedFingerCount === 5) {
+                    // 比出 5 -> 流星散开
+                     controls.autoRotate = true;
+                    camera.position.x = 0;
+                    camera.position.y = 0;
+                    camera.position.z = 100;
+                    currentTargetArr = targets.fireworks; 
+                    targetOpacity = 0.7; 
+                    if(meteorParticles) meteorParticles.visible = true;
+                    hintEl.innerText = "⭐流星⭐";
                     hintEl.style.opacity = 1;
                 }
                 else if (detectedFingerCount === 4) {
-                    // 比出四 -> 显示 "杨雅淇"
+                    // 比出 4 -> 显示 "杨雅淇"
+                    camera.position.set(0, 0, 400); // 确保看文字时位置对正
                     currentTargetArr = targets.nameYangY;
                     targetOpacity = 1.0;
                     if(meteorParticles) meteorParticles.visible = false;
                     hintEl.innerText = "杨雅淇";
                     hintEl.style.opacity = 1;
                 }
+                else if (detectedFingerCount === 3) {
+                    // 比出 3 -> 显示 爱心
+                    camera.position.set(0, 0, 400);
+                    currentTargetArr = targets.cubicHeart;
+                    targetOpacity = 1.0;
+                    if(meteorParticles) meteorParticles.visible = false;
+                    hintEl.innerText = "❤️";
+                    hintEl.style.opacity = 1;
+                }
+                else if (detectedFingerCount === 2) {
+                    // 比出 2 -> 显示 "杨瑞智"
+                    camera.position.set(0, 0, 400);
+                    currentTargetArr = targets.nameYangR;
+                    targetOpacity = 1.0;
+                    if(meteorParticles) meteorParticles.visible = false;
+                    hintEl.innerText = "杨瑞智";
+                    hintEl.style.opacity = 1;
+                }
                 else {
-                    // --- 保持原有逻辑：手掌开合 ---
-                    const closureThreshold = 0.3; 
-                    const openThreshold = 0.7;   
-
-                    if (handInteractionFactor < closureThreshold) {
-                        // 手掌聚拢 -> 聚集成字 (情话)
-                        currentTargetArr = targets.ringTexts[activeRingIndex];
-                        targetOpacity = 1.0; 
-                        if(meteorParticles) meteorParticles.visible = false;
-                        hintEl.innerText = loveWords[activeRingIndex];
-                        hintEl.style.opacity = 1;
-                        if (Date.now() - hoverStartTime > 4000) { 
-                             if(hintEl.style.opacity > 0) hintEl.style.opacity -= 0.01;
-                        }
-                    } else if (handInteractionFactor >= openThreshold) {
-                        // 手掌张开 -> 散开流星
-                         controls.autoRotate = true;
-                        camera.position.x = 0;
-                        camera.position.y = 0;
-                        camera.position.z = 100;
-                        currentTargetArr = targets.fireworks; 
-                        targetOpacity = 0.7; 
-                        if(meteorParticles) meteorParticles.visible = true;
-                        hintEl.innerText = "⭐ 散作流星 ⭐";
-                        hintEl.style.opacity = 1;
-                    } else {
-                        // 中间状态 (原本)
-                        camera.position.x = 0;
-                        camera.position.y = 0;
-                        camera.position.z = 400;
-                        currentTargetArr = targets.ringTexts[activeRingIndex];
-                        targetOpacity = 1.0; 
-                        if(meteorParticles) meteorParticles.visible = false;
-                        hintEl.innerText = loveWords[activeRingIndex];
-                        hintEl.style.opacity = 1;
-                        if (Date.now() - hoverStartTime > 4000) { 
-                             if(hintEl.style.opacity > 0) hintEl.style.opacity -= 0.01;
-                        }
+                    // --- 默认（握拳/比1）：聚合为环对应的文字 ---
+                    camera.position.x = 0;
+                    camera.position.y = 0;
+                    camera.position.z = 400;
+                    currentTargetArr = targets.ringTexts[activeRingIndex];
+                    targetOpacity = 1.0; 
+                    if(meteorParticles) meteorParticles.visible = false;
+                    
+                    hintEl.innerText = loveWords[activeRingIndex];
+                    hintEl.style.opacity = 1;
+                    // 自动隐藏提示
+                    if (Date.now() - hoverStartTime > 4000) { 
+                         if(hintEl.style.opacity > 0) hintEl.style.opacity -= 0.01;
                     }
                 }
                 
@@ -893,7 +883,7 @@
             if (numHands > 0) {
                 const landmarks = results.multiHandLandmarks[0]; 
                 
-                // --- 1. 原有的闭合度计算 ---
+                // 保留旧的 factor 计算，以防万一需要平滑过渡
                 const index = landmarks[8]; 
                 const middle = landmarks[12]; 
                 const pinky = landmarks[20]; 
@@ -911,24 +901,25 @@
                 factor = Math.max(0, Math.min(1, factor * 2)); 
                 handInteractionFactor += (factor - handInteractionFactor) * 0.1; 
 
-                // --- 2. 新增：简单的数手指逻辑 (用于比2、3、4) ---
-                // 判断手指伸直：指尖距离手腕 比 关节距离手腕 远一定比例
+                // --- 核心：数手指逻辑 (增加大拇指支持) ---
                 const isFingerUp = (tipIdx, pipIdx) => {
                     const dTip = Math.sqrt(Math.pow(landmarks[tipIdx].x - landmarks[0].x, 2) + Math.pow(landmarks[tipIdx].y - landmarks[0].y, 2));
                     const dPip = Math.sqrt(Math.pow(landmarks[pipIdx].x - landmarks[0].x, 2) + Math.pow(landmarks[pipIdx].y - landmarks[0].y, 2));
-                    return dTip > dPip * 1.1; // 阈值
+                    return dTip > dPip * 1.1; 
                 };
 
                 let count = 0;
+                // 拇指判断：使用 Tip 到 MCP 的距离 与 IP 到 MCP 的距离对比，或者简单地用距离手腕的长度
+                // 这里为了简单，使用与手指相同的逻辑（指尖距离手腕 > 关节距离手腕）
+                if (isFingerUp(4, 2)) count++;   // 拇指
                 if (isFingerUp(8, 6)) count++;   // 食指
                 if (isFingerUp(12, 10)) count++; // 中指
                 if (isFingerUp(16, 14)) count++; // 无名指
                 if (isFingerUp(20, 18)) count++; // 小指
-                // 拇指判断比较复杂，暂时忽略，仅靠四指判断2/3/4足够准确
                 
                 detectedFingerCount = count;
 
-                // --- 3. 彗尾位置更新 ---
+                // --- 彗尾位置更新 ---
                 if (cometTailParticles) {
                     const worldRangeX = 160; 
                     const worldRangeY = 120;
@@ -949,7 +940,7 @@
                 }
             } else {
                 handInteractionFactor += (0 - handInteractionFactor) * 0.05;
-                detectedFingerCount = 0; // 无手时重置为0
+                detectedFingerCount = 0; 
 
                 if (cometTailParticles) {
                     const ctPositions = cometTailParticles.geometry.attributes.position.array;
@@ -974,4 +965,3 @@
     </script>
 </body>
 </html>
-
