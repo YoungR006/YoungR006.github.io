@@ -1,887 +1,1808 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>宝宝永远开心</title>
-    <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; user-select: none; }
-        canvas { display: block; }
-        
-        /* --- 调试控制台 (默认隐藏) --- */
-        #ui-container {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 100;
-            display: none; /* 默认隐藏，按 K 键显示 */
-        }
-        
-        /* --- 全新的顶部模型切换 UI --- */
-        #model-menu {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 50;
-            display: flex;
-            gap: 12px;
-            padding: 10px 25px;
-            background: rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(12px);
-            border-radius: 40px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            flex-wrap: wrap;
-            justify-content: center;
-            width: max-content;
-            max-width: 90vw;
-            transition: opacity 0.3s;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XMind Pitch Mode - 网页版</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+/* ===== 全局基础 ===== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #0a0a1a; color: #fff; overflow: hidden; height: 100vh; width: 100vw;
+}
+#app { width: 100%; height: 100%; }
 
-        .model-btn {
-            background: transparent;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: rgba(255, 255, 255, 0.8);
-            padding: 6px 16px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            letter-spacing: 1px;
-        }
+/* ===== 上传页 ===== */
+#uploadPage {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100%; padding: 40px;
+}
+.brand { text-align: center; margin-bottom: 40px; }
+.brand h1 {
+  font-size: 32px; font-weight: 800;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.brand p { font-size: 14px; color: #64748b; margin-top: 6px; }
+.upload-box {
+  border: 2px dashed #3a3a5c; border-radius: 20px; padding: 50px 60px;
+  text-align: center; cursor: pointer; transition: all 0.3s;
+  background: rgba(255,255,255,0.02); max-width: 480px; width: 100%;
+}
+.upload-box:hover { border-color: #6366f1; background: rgba(99,102,241,0.05); }
+.upload-box.dragover { border-color: #818cf8; background: rgba(99,102,241,0.1); }
+.upload-icon { font-size: 40px; margin-bottom: 12px; }
+.upload-title { font-size: 18px; font-weight: 600; color: #e2e8f0; margin-bottom: 6px; }
+.upload-desc { font-size: 13px; color: #94a3b8; }
+.upload-hint { margin-top: 20px; font-size: 12px; color: #475569; }
+input[type="file"] { display: none; }
+#loadingArea, #errorArea { margin-top: 24px; display: none; }
+.loading { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.spinner {
+  width: 36px; height: 36px; border: 3px solid rgba(99,102,241,0.2);
+  border-top-color: #6366f1; border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.error-box {
+  padding: 14px 20px; background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.2); border-radius: 10px;
+  color: #fca5a5; font-size: 13px; max-width: 480px;
+}
 
-        .model-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            transform: translateY(-2px);
-        }
+/* ===== 预览页 ===== */
+#previewPage { display: none; flex-direction: column; height: 100%; }
+.toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 20px; background: rgba(15,15,35,0.95);
+  border-bottom: 1px solid #1e1e3f; backdrop-filter: blur(10px); flex-shrink: 0;
+}
+.toolbar-left { display: flex; align-items: center; gap: 12px; }
+.toolbar-title {
+  font-size: 15px; font-weight: 600; color: #e2e8f0;
+  max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.toolbar-info { font-size: 11px; color: #475569; margin-left: 4px; }
+.btn {
+  padding: 7px 16px; border-radius: 8px; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 500; transition: all 0.2s;
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+}
+.btn-primary { background: #6366f1; color: white; }
+.btn-primary:hover { background: #818cf8; }
+.btn-secondary { background: rgba(255,255,255,0.08); color: #cbd5e1; }
+.btn-secondary:hover { background: rgba(255,255,255,0.12); }
+.btn-danger { background: rgba(239,68,68,0.15); color: #fca5a5; }
+.btn-danger:hover { background: rgba(239,68,68,0.25); }
+.btn-sm { padding: 4px 10px; font-size: 11px; border-radius: 6px; }
 
-        .model-btn.active {
-            background: rgba(255, 0, 127, 0.6); /* 激活色：洋红 */
-            border-color: rgba(255, 0, 127, 0.8);
-            color: white;
-            box-shadow: 0 0 15px rgba(255, 0, 127, 0.4);
-            font-weight: bold;
-        }
+.preview-body {
+  flex: 1; overflow: auto; position: relative; background: #0f0f23; padding: 40px;
+}
+.mindmap-tree {
+  display: flex; align-items: flex-start; justify-content: flex-start;
+  min-width: fit-content; min-height: fit-content; padding: 20px 0;
+}
 
-        /* 摄像头小窗 */
-        .input_video {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            width: 160px;
-            height: 120px;
-            border-radius: 12px;
-            border: 2px solid rgba(255,255,255,0.2);
-            transform: scaleX(-1);
-            opacity: 0.6;
-            z-index: 5;
-            transition: opacity 0.3s;
-        }
-        .input_video:hover { opacity: 1; }
+/* ===== 预览右向层次树 ===== */
+.tree-node { display: flex; align-items: center; position: relative; }
+.node-card {
+  padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 500;
+  color: #e2e8f0; white-space: nowrap; max-width: 280px;
+  overflow: hidden; text-overflow: ellipsis; position: relative; z-index: 2;
+  cursor: default; transition: all 0.2s; display: flex; align-items: center; gap: 8px;
+}
+.node-card:hover { transform: scale(1.02); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+.node-card.level-0 {
+  background: #6366f1; color: white; font-size: 20px; font-weight: 700;
+  padding: 16px 28px; box-shadow: 0 4px 24px rgba(99,102,241,0.35); border-radius: 12px;
+}
+.node-card.level-1 {
+  font-size: 15px; background: rgba(168,85,247,0.12); border: 1px solid rgba(168,85,247,0.2);
+  box-shadow: 0 2px 12px rgba(168,85,247,0.08);
+}
+.node-card.level-2 {
+  font-size: 13px; background: rgba(6,182,212,0.08); border: 1px solid rgba(6,182,212,0.12); color: #cbd5e1;
+}
+.node-card.level-3 {
+  font-size: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); color: #94a3b8;
+}
+.child-count-badge {
+  font-size: 10px; background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8);
+  padding: 1px 7px; border-radius: 10px; font-weight: 600; flex-shrink: 0;
+}
+.node-children {
+  display: flex; flex-direction: column; gap: 14px; margin-left: 70px; position: relative;
+}
+.node-children::before {
+  content: ''; position: absolute; left: -35px; top: 50%; width: 35px; height: 2px;
+  transform: translateY(-50%); background: linear-gradient(90deg, #6366f1, #3a3a5c); border-radius: 1px;
+}
+.node-children .tree-node::before {
+  content: ''; position: absolute; left: -35px; top: 50%; width: 35px; height: 2px;
+  transform: translateY(-50%); background: #3a3a5c; border-radius: 1px;
+}
+.node-children .tree-node::after {
+  content: ''; position: absolute; left: -35px; top: 0; bottom: 0; width: 2px; background: #3a3a5c;
+}
+.node-children .tree-node:first-child::after { top: 50%; }
+.node-children .tree-node:last-child::after { bottom: 50%; }
+.node-children .tree-node:only-child::after { display: none; }
 
-        /* 全屏按钮 */
-        #fullscreen-btn {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            width: 40px;
-            height: 40px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: white;
-            border-radius: 50%;
-            cursor: pointer;
-            backdrop-filter: blur(5px);
-            transition: all 0.3s;
-            z-index: 10;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-        }
-        #fullscreen-btn:hover { background: rgba(255, 255, 255, 0.3); transform: scale(1.1); }
+.empty-state { text-align: center; color: #475569; padding: 60px 20px; }
+.empty-state h3 { font-size: 18px; margin-bottom: 8px; color: #64748b; }
 
-        #loading {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 18px;
-            text-align: center;
-            pointer-events: none;
-            line-height: 1.6;
-        }
-        
-        /* 交互提示文字 */
-        #hint-text {
-            position: absolute;
-            top: 55%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: rgba(255,255,255,0.9);
-            font-size: 28px;
-            font-weight: bold;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.8s;
-            text-shadow: 0 0 15px rgba(0,0,0,0.8);
-            letter-spacing: 4px;
-            z-index: 8;
-            width: 100%;
-            text-align: center;
-        }
+/* ===== 演示页 ===== */
+#pitchPage {
+  display: none; position: fixed; inset: 0; background: #0a0a1a; z-index: 9999; overflow: hidden;
+}
 
-        /* 返回按钮 */
-        #back-btn {
-            position: absolute;
-            bottom: 80px; 
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 10px 24px;
-            background: rgba(255, 255, 255, 0.1); 
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: rgba(255, 255, 255, 0.9);
-            border-radius: 30px;
-            cursor: pointer;
-            backdrop-filter: blur(8px);
-            transition: all 0.4s;
-            z-index: 15;
-            font-size: 16px;
-            letter-spacing: 2px;
-            opacity: 1;
-            pointer-events: auto;
-        }
-        #back-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-        }
+/* 顶部控制栏 */
+.pitch-top-controls {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  padding: 8px 16px;
+  background: linear-gradient(to bottom, rgba(10,10,26,0.98), rgba(10,10,26,0.85) 80%, transparent);
+  pointer-events: none;
+}
+.pitch-top-controls > * { pointer-events: auto; }
+.control-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.08); margin: 0 4px; }
+.control-group { display: flex; align-items: center; gap: 3px; }
 
-        /* 移动端适配 */
-        @media (max-width: 768px) {
-            #model-menu {
-                top: 10px;
-                padding: 8px 15px;
-                gap: 8px;
-                width: 90%;
-            }
-            .model-btn {
-                font-size: 12px;
-                padding: 5px 12px;
-            }
-            #hint-text { font-size: 20px; }
-        }
-    </style>
+/* 速度按钮 */
+.speed-btn {
+  padding: 3px 9px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04); color: #94a3b8; cursor: pointer;
+  font-size: 10px; transition: all 0.2s; font-weight: 500;
+}
+.speed-btn.active, .speed-btn:hover { background: #6366f1; border-color: #6366f1; color: white; }
+.speed-btn:hover:not(.active) { background: rgba(99,102,241,0.3); }
+.auto-play-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: #10b981;
+  animation: pulse-dot 1.2s ease-in-out infinite; display: inline-block; margin-right: 3px;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(1.8); }
+}
+
+/* ===== 演示树视口（左侧，给面板留空间）===== */
+.pitch-viewport {
+  position: absolute; top: 48px; left: 0; right: 440px; bottom: 64px;
+  overflow: auto; scroll-behavior: smooth;
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+.pitch-viewport::-webkit-scrollbar { width: 6px; height: 6px; }
+.pitch-viewport::-webkit-scrollbar-track { background: transparent; }
+.pitch-viewport::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+.pitch-tree {
+  display: flex; align-items: flex-start;
+  min-width: fit-content; min-height: 100%;
+  padding: 40px 40px;
+}
+
+/* ===== Pitch Slide Panel（右侧独立演示面板）===== */
+.pitch-slide-panel {
+  position: absolute; top: 48px; right: 0; bottom: 64px; width: 440px;
+  background: rgba(12,12,30,0.97); border-left: 1px solid #1e1e3f;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: flex-start; padding: 60px 28px 40px;
+  z-index: 20; overflow-y: auto;
+  backdrop-filter: blur(10px);
+}
+.psp-breadcrumb {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-bottom: 32px; font-size: 12px; color: #64748b; flex-wrap: wrap;
+}
+.psp-title {
+  font-size: 32px; font-weight: 800; line-height: 1.3; margin-bottom: 24px;
+  color: #f1f5f9; text-align: center; word-break: break-word;
+  width: 100%;
+}
+.psp-title.root-title {
+  font-size: 38px;
+  background: linear-gradient(135deg, #e2e8f0, #94a3b8);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.psp-subtitle { font-size: 14px; color: #64748b; margin-top: -16px; margin-bottom: 24px; }
+.psp-children {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+  width: 100%; margin-bottom: 20px;
+}
+.psp-child-card {
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px; padding: 12px 20px; font-size: 15px; color: #cbd5e1;
+  backdrop-filter: blur(10px); transition: all 0.25s; word-break: break-word;
+  max-width: 380px; cursor: default;
+  position: relative;
+}
+.psp-child-card:hover {
+  background: rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.25);
+  transform: translateY(-2px);
+}
+.psp-child-card .cover-overlay { border-radius: 12px; }
+.psp-note-area {
+  width: 100%; margin-top: 20px; font-size: 14px; color: #94a3b8; line-height: 1.7;
+  text-align: center; padding: 12px 20px;
+  background: rgba(255,255,255,0.02); border-radius: 10px;
+  position: relative;
+}
+.psp-note-area .cover-overlay { border-radius: 10px; }
+.psp-empty-hint { color: #334155; font-size: 13px; margin-top: 24px; }
+
+/* 树节点 */
+.pt-node {
+  display: flex; align-items: center; position: relative;
+  transition: filter 0.3s;
+}
+.pt-card-wrapper {
+  position: relative; flex-shrink: 0; cursor: pointer;
+  transition: transform 0.25s ease;
+}
+.pt-card-wrapper:hover { transform: scale(1.03); }
+.pt-card {
+  padding: 12px 22px; border-radius: 12px; font-weight: 600; color: #e2e8f0;
+  white-space: nowrap; max-width: 300px; overflow: hidden; text-overflow: ellipsis;
+  transition: all 0.3s ease; position: relative; z-index: 2;
+}
+.pt-card.lv-0 {
+  font-size: 22px; padding: 18px 32px; background: #6366f1; color: white;
+  box-shadow: 0 4px 28px rgba(99,102,241,0.4); border-radius: 14px;
+}
+.pt-card.lv-1 {
+  font-size: 16px; background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.25);
+}
+.pt-card.lv-2 {
+  font-size: 14px; background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.15);
+}
+.pt-card.lv-3 {
+  font-size: 13px; background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.12); color: #cbd5e1;
+}
+.pt-card.lv-4 {
+  font-size: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); color: #94a3b8;
+}
+
+/* 渐进展开：未揭示的节点隐藏 */
+.pt-node.unrevealed { display: none !important; }
+
+/* 有隐藏子节点的提示 */
+.pt-hidden-hint {
+  display: inline-block; font-size: 10px; color: #818cf8;
+  background: rgba(99,102,241,0.2); padding: 1px 6px; border-radius: 8px;
+  margin-left: 6px; font-weight: 500; cursor: default;
+  animation: hintPulse 2s ease-in-out infinite;
+}
+@keyframes hintPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* 焦点高亮 */
+.pt-card-wrapper.focused { z-index: 10; }
+.pt-card-wrapper.focused .pt-card {
+  animation: focusGlow 1.5s ease-in-out infinite;
+  z-index: 10;
+}
+@keyframes focusGlow {
+  0%, 100% { box-shadow: 0 0 16px rgba(99,102,241,0.5), 0 0 40px rgba(99,102,241,0.2); }
+  50% { box-shadow: 0 0 28px rgba(99,102,241,0.8), 0 0 60px rgba(99,102,241,0.4); }
+}
+.pt-card-wrapper.focused .pt-card.lv-0 {
+  animation: focusGlowRoot 1.5s ease-in-out infinite;
+}
+@keyframes focusGlowRoot {
+  0%, 100% { box-shadow: 0 4px 28px rgba(99,102,241,0.4), 0 0 50px rgba(99,102,241,0.3); }
+  50% { box-shadow: 0 4px 40px rgba(99,102,241,0.8), 0 0 80px rgba(168,85,247,0.5); }
+}
+
+/* 节点备注 */
+.pt-note {
+  font-size: 11px; color: #64748b; font-weight: 400; margin-top: 4px;
+  max-width: 280px; white-space: normal; line-height: 1.4;
+}
+
+/* 子节点计数 */
+.pt-badge {
+  display: inline-block; font-size: 10px; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7);
+  padding: 1px 7px; border-radius: 10px; margin-left: 6px; font-weight: 500;
+}
+
+/* 树子节点列 */
+.pt-children {
+  display: flex; flex-direction: column; gap: 16px;
+  margin-left: 50px; position: relative;
+}
+/* 父节点到子节点列的横线 */
+.pt-children::before {
+  content: ''; position: absolute; left: -25px; top: 50%;
+  width: 25px; height: 2px; transform: translateY(-50%);
+  background: rgba(255,255,255,0.12); border-radius: 1px;
+}
+/* 每个子节点的横线 */
+.pt-children > .pt-node::before {
+  content: ''; position: absolute; left: -25px; top: 50%;
+  width: 25px; height: 2px; transform: translateY(-50%);
+  background: rgba(255,255,255,0.12); border-radius: 1px;
+}
+/* 连接兄弟节点的竖线 */
+.pt-children > .pt-node::after {
+  content: ''; position: absolute; left: -25px; top: 0; bottom: 0;
+  width: 2px; background: rgba(255,255,255,0.12);
+}
+.pt-children > .pt-node:first-child::after { top: 50%; }
+.pt-children > .pt-node:last-child::after { bottom: 50%; }
+.pt-children > .pt-node:only-child::after { display: none; }
+
+/* ===== 遮盖系统 ===== */
+.coverable { position: relative; }
+.cover-overlay {
+  position: absolute; inset: 0; backdrop-filter: blur(14px);
+  background: rgba(15, 15, 35, 0.88); border-radius: inherit;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 5; transition: all 0.3s ease;
+  opacity: 1; pointer-events: auto;
+}
+.cover-overlay.hidden { opacity: 0; pointer-events: none; }
+.cover-overlay:hover { background: rgba(15, 15, 35, 0.7); }
+.cover-icon { font-size: 22px; opacity: 0.5; transition: all 0.2s; user-select: none; }
+.cover-overlay:hover .cover-icon { opacity: 0.8; transform: scale(1.1); }
+.cover-mode-indicator {
+  position: fixed; top: 52px; left: 50%; transform: translateX(-50%);
+  background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5; padding: 6px 18px; border-radius: 20px;
+  font-size: 12px; font-weight: 600; z-index: 100; pointer-events: none;
+  display: none; animation: fadeInDown 0.3s ease;
+}
+.cover-mode-indicator.active { display: block; }
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== 涂鸦 ===== */
+#drawCanvas {
+  position: fixed; inset: 0; z-index: 45; pointer-events: none; cursor: crosshair;
+}
+#drawCanvas.active { pointer-events: auto; }
+.draw-toolbar {
+  position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+  display: none; align-items: center; gap: 6px;
+  padding: 8px 16px; background: rgba(15, 15, 35, 0.96);
+  border: 1px solid #1e1e3f; border-radius: 14px;
+  backdrop-filter: blur(12px); z-index: 55;
+}
+.draw-toolbar.active { display: flex; animation: fadeInUp 0.3s ease; }
+.draw-tool-btn {
+  width: 34px; height: 34px; border-radius: 8px; border: 1px solid transparent;
+  background: rgba(255,255,255,0.06); color: #94a3b8; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; transition: all 0.2s;
+}
+.draw-tool-btn:hover { background: rgba(255,255,255,0.12); color: white; }
+.draw-tool-btn.active { background: rgba(99,102,241,0.2); border-color: #6366f1; color: white; }
+.draw-color-dot {
+  width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent;
+  cursor: pointer; transition: all 0.2s;
+}
+.draw-color-dot:hover, .draw-color-dot.active { border-color: white; transform: scale(1.2); }
+.draw-size-dot {
+  width: 28px; height: 28px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06); color: #94a3b8; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; transition: all 0.2s;
+}
+.draw-size-dot:hover, .draw-size-dot.active { background: rgba(99,102,241,0.2); border-color: #6366f1; color: white; }
+.draw-sep { width: 1px; height: 22px; background: rgba(255,255,255,0.08); }
+
+/* ===== 测验面板 ===== */
+.quiz-panel {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  padding: 20px 32px 28px;
+  background: linear-gradient(to top, rgba(10,10,26,0.98), rgba(10,10,26,0.9) 60%, transparent);
+  z-index: 70; display: none; flex-direction: column; align-items: center; gap: 14px;
+}
+.quiz-panel.active { display: flex; animation: quizSlideUp 0.4s ease; }
+@keyframes quizSlideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.quiz-progress { font-size: 13px; color: #64748b; }
+.quiz-progress strong { color: #818cf8; }
+.quiz-hint-area {
+  padding: 18px 40px; background: rgba(99,102,241,0.05);
+  border: 1px dashed rgba(99,102,241,0.25); border-radius: 14px;
+  color: #94a3b8; font-size: 15px; cursor: pointer; transition: all 0.3s; text-align: center;
+}
+.quiz-hint-area:hover { background: rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.5); color: #cbd5e1; }
+
+/* ===== 标签系统 ===== */
+.tag-input {
+  width: 110px; padding: 5px 10px; border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05);
+  color: #e2e8f0; font-size: 12px; outline: none; transition: border 0.2s;
+}
+.tag-input:focus { border-color: #6366f1; width: 140px; }
+.tag-input::placeholder { color: #475569; }
+.tag-panel {
+  position: fixed; top: 52px; right: 12px; width: 280px; max-height: 420px;
+  overflow-y: auto; background: rgba(15, 15, 35, 0.97);
+  border: 1px solid #1e1e3f; border-radius: 12px; padding: 14px;
+  z-index: 80; display: none; backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.tag-panel.open { display: block; animation: fadeInDown 0.2s ease; }
+.tag-panel-title { font-size: 12px; color: #64748b; margin-bottom: 10px; font-weight: 600; }
+.tag-panel-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 10px; border-radius: 6px; cursor: pointer; transition: background 0.2s; font-size: 13px;
+}
+.tag-panel-item:hover { background: rgba(255,255,255,0.06); }
+.tag-panel-tag { color: #a5b4fc; font-weight: 500; }
+.tag-panel-slide { color: #94a3b8; font-size: 12px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag-panel-empty { color: #475569; font-size: 12px; text-align: center; padding: 24px 0; }
+
+/* 节点标签芯片 */
+.node-tags {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; justify-content: center;
+}
+.tag-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 9px; border-radius: 10px;
+  background: rgba(99,102,241,0.18); color: #a5b4fc;
+  font-size: 10px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+}
+.tag-chip:hover { background: rgba(99,102,241,0.3); transform: translateY(-1px); }
+.tag-chip .tag-remove { font-size: 13px; opacity: 0.5; margin-left: 2px; cursor: pointer; line-height: 1; }
+.tag-chip .tag-remove:hover { opacity: 1; color: #fca5a5; }
+
+/* 跳转高亮 */
+.pt-card.jump-highlight { animation: jumpPulse 0.7s ease 3; }
+@keyframes jumpPulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(99,102,241,0); }
+  50% { box-shadow: 0 0 30px rgba(99,102,241,0.8), 0 0 60px rgba(99,102,241,0.3); }
+}
+
+/* ===== 底部控制栏 ===== */
+.pitch-controls {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  padding: 12px 32px; display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(to top, rgba(10,10,26,0.95), transparent);
+  z-index: 10; pointer-events: none;
+}
+.pitch-controls > * { pointer-events: auto; }
+.pitch-progress {
+  position: absolute; bottom: 0; left: 0; height: 3px;
+  background: #6366f1; transition: width 0.3s;
+}
+.pitch-page { font-size: 12px; color: #475569; }
+.pitch-hint { font-size: 11px; color: #334155; }
+.pitch-nav { display: flex; gap: 10px; }
+.nav-btn {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04);
+  color: #94a3b8; cursor: pointer; display: flex;
+  align-items: center; justify-content: center; transition: all 0.2s; font-size: 12px;
+}
+.nav-btn:hover { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.3); color: white; }
+.nav-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+
+/* ===== 响应式 ===== */
+@media (max-width: 768px) {
+  .pitch-top-controls { gap: 2px; padding: 6px 10px; }
+  .pitch-top-controls .btn { padding: 5px 10px; font-size: 11px; }
+  .speed-btn { padding: 2px 7px; font-size: 9px; }
+  .pt-card { padding: 8px 14px; max-width: 200px; }
+  .pt-card.lv-0 { font-size: 17px; padding: 12px 22px; }
+  .pt-card.lv-1 { font-size: 14px; }
+  .pt-card.lv-2 { font-size: 12px; }
+  .pitch-tree { padding: 30px 24px; }
+  .pt-children { margin-left: 36px; gap: 12px; }
+  .pt-children::before, .pt-children > .pt-node::before { left: -18px; width: 18px; }
+  .pt-children > .pt-node::after { left: -18px; }
+  .tag-panel { width: 240px; right: 4px; }
+  /* 移动端：面板缩窄或隐藏 */
+  .pitch-viewport { right: 0; }
+  .pitch-slide-panel {
+    width: 100%; right: 0; top: auto; bottom: 64px; height: 45%;
+    border-left: none; border-top: 1px solid #1e1e3f;
+  }
+}
+</style>
 </head>
 <body>
 
-    <div id="loading">正在初始化摄像头与AI模型...<br><span style="font-size:12px; opacity:0.6">首次加载可能较慢，请允许摄像头权限</span></div>
-    
-    <div id="hint-text"></div>
-    
-    <div id="model-menu"></div>
+<div id="app">
+  <!-- ===== 上传页 ===== -->
+  <div id="uploadPage">
+    <div class="brand">
+      <h1>XMind Pitch Mode</h1>
+      <p>网页版 · 一键将思维导图变成演示文稿</p>
+    </div>
+    <div class="upload-box" id="uploadBox">
+      <div class="upload-icon">📂</div>
+      <div class="upload-title">点击或拖拽上传 .xmind 文件</div>
+      <div class="upload-desc">支持 XMind 8 / XMind 2020+ 格式</div>
+      <div class="upload-hint">文件仅在本地浏览器处理，不上传服务器</div>
+    </div>
+    <input type="file" id="fileInput" accept=".xmind">
+    <div id="loadingArea">
+      <div class="loading">
+        <div class="spinner"></div>
+        <div style="color:#64748b;font-size:13px;">正在解析思维导图...</div>
+      </div>
+    </div>
+    <div id="errorArea" class="error-box"></div>
+  </div>
 
-    <button id="back-btn">⟲ 重置视角</button>
-    <button id="fullscreen-btn" title="全屏">⛶</button>
-    
-    <div id="ui-container"></div>
-    
-    <video class="input_video" playsinline></video>
+  <!-- ===== 预览页 ===== -->
+  <div id="previewPage">
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <button class="btn btn-secondary" onclick="showUpload()">← 返回</button>
+        <span class="toolbar-title" id="previewTitle">未命名导图</span>
+        <span class="toolbar-info" id="previewInfo"></span>
+      </div>
+      <button class="btn btn-primary" onclick="startPitch()">▶ 开始演示</button>
+    </div>
+    <div class="preview-body" id="previewBody">
+      <div class="mindmap-tree" id="mindmapTree"></div>
+    </div>
+  </div>
 
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-            }
+  <!-- ===== 演示页 ===== -->
+  <div id="pitchPage">
+    <!-- 顶部控制栏 -->
+    <div class="pitch-top-controls" id="pitchTopControls">
+      <button class="btn btn-secondary btn-sm" onclick="exitPitch()">← 退出</button>
+      <span class="control-divider"></span>
+      <div class="control-group">
+        <button class="btn btn-secondary btn-sm" id="btnAutoPlay" onclick="toggleAutoPlay()">
+          <span class="auto-play-dot" id="autoPlayDot" style="display:none"></span>
+          <span id="autoPlayLabel">▶ 播放</span>
+        </button>
+        <button class="speed-btn active" data-speed="1" onclick="setAutoPlaySpeed(1,this)">1x</button>
+        <button class="speed-btn" data-speed="0.5" onclick="setAutoPlaySpeed(0.5,this)">0.5x</button>
+        <button class="speed-btn" data-speed="1.5" onclick="setAutoPlaySpeed(1.5,this)">1.5x</button>
+        <button class="speed-btn" data-speed="2" onclick="setAutoPlaySpeed(2,this)">2x</button>
+        <button class="speed-btn" data-speed="3" onclick="setAutoPlaySpeed(3,this)">3x</button>
+      </div>
+      <span class="control-divider"></span>
+      <div class="control-group">
+        <button class="btn btn-secondary btn-sm" id="btnCoverMode" onclick="toggleCoverMode()">🔒 遮盖</button>
+        <button class="btn btn-secondary btn-sm" id="btnCoverAll" onclick="coverAll()" style="display:none">遮住子节点</button>
+        <button class="btn btn-secondary btn-sm" id="btnUncoverAll" onclick="uncoverAll()" style="display:none">揭开子节点</button>
+      </div>
+      <span class="control-divider"></span>
+      <button class="btn btn-secondary btn-sm" id="btnBrainstorm" onclick="toggleBrainstormMode()">🎨 涂鸦</button>
+      <span class="control-divider"></span>
+      <button class="btn btn-secondary btn-sm" id="btnQuiz" onclick="toggleQuizMode()">❓ 测验</button>
+      <span class="control-divider"></span>
+      <div class="control-group">
+        <input type="text" class="tag-input" id="tagInput" placeholder="标签..." onkeydown="handleTagInput(event)">
+        <button class="btn btn-secondary btn-sm" onclick="openTagPanel()" title="标签列表">🏷</button>
+      </div>
+    </div>
+
+    <!-- 遮盖模式提示 -->
+    <div class="cover-mode-indicator" id="coverModeIndicator">遮盖模式 · 点击节点卡片切换遮盖 · ESC 退出</div>
+
+    <!-- 思维导图树视口 -->
+    <div class="pitch-viewport" id="pitchViewport">
+      <div class="pitch-tree" id="pitchTree"></div>
+    </div>
+
+    <!-- 独立演示面板（右侧，不受渐进展开影响）-->
+    <div class="pitch-slide-panel" id="pitchSlidePanel">
+      <div class="psp-breadcrumb" id="pspBreadcrumb"></div>
+      <div class="psp-title" id="pspTitle"></div>
+      <div class="psp-subtitle" id="pspSubtitle" style="display:none"></div>
+      <div class="psp-children" id="pspChildren"></div>
+      <div class="psp-note-area coverable" id="pspNoteArea" style="display:none">
+        <div class="psp-note-text" id="pspNoteText"></div>
+        <div class="cover-overlay hidden"><span class="cover-icon">🔒</span></div>
+      </div>
+      <div class="psp-empty-hint" id="pspEmpty">子节点将在下方卡片中显示</div>
+    </div>
+
+    <!-- 涂鸦画布 -->
+    <canvas id="drawCanvas"></canvas>
+
+    <!-- 涂鸦工具栏 -->
+    <div class="draw-toolbar" id="drawToolbar">
+      <button class="draw-tool-btn active" id="drawToolPen" onclick="setDrawTool('pen')" title="画笔">✏️</button>
+      <button class="draw-tool-btn" id="drawToolEraser" onclick="setDrawTool('eraser')" title="橡皮">🧹</button>
+      <span class="draw-sep"></span>
+      <button class="draw-color-dot active" style="background:#ff4444" data-color="#ff4444" onclick="setDrawColor('#ff4444',this)"></button>
+      <button class="draw-color-dot" style="background:#44cc44" data-color="#44cc44" onclick="setDrawColor('#44cc44',this)"></button>
+      <button class="draw-color-dot" style="background:#4488ff" data-color="#4488ff" onclick="setDrawColor('#4488ff',this)"></button>
+      <button class="draw-color-dot" style="background:#ffdd44" data-color="#ffdd44" onclick="setDrawColor('#ffdd44',this)"></button>
+      <button class="draw-color-dot" style="background:#ff44cc" data-color="#ff44cc" onclick="setDrawColor('#ff44cc',this)"></button>
+      <button class="draw-color-dot" style="background:#ffffff" data-color="#ffffff" onclick="setDrawColor('#ffffff',this)"></button>
+      <span class="draw-sep"></span>
+      <button class="draw-size-dot active" data-size="3" onclick="setDrawSize(3,this)">S</button>
+      <button class="draw-size-dot" data-size="6" onclick="setDrawSize(6,this)">M</button>
+      <button class="draw-size-dot" data-size="10" onclick="setDrawSize(10,this)">L</button>
+      <span class="draw-sep"></span>
+      <button class="draw-tool-btn" onclick="clearCanvas()" title="清除画布">🗑</button>
+    </div>
+
+    <!-- 标签面板 -->
+    <div class="tag-panel" id="tagPanel">
+      <div class="tag-panel-title">🏷 标签列表</div>
+      <div id="tagPanelContent"></div>
+    </div>
+
+    <!-- 测验面板 -->
+    <div class="quiz-panel" id="quizPanel">
+      <div class="quiz-progress" id="quizProgress">已复习 <strong>0</strong> / <strong>0</strong> 题</div>
+      <div class="quiz-hint-area" id="quizHintArea" onclick="revealQuizAnswer()">
+        💡 点击此处查看答案 · 或点击被遮住的节点
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary btn-sm" id="btnNextQuiz" onclick="nextQuizSlide()">下一题 →</button>
+        <button class="btn btn-secondary btn-sm" onclick="exitQuiz()">退出测验</button>
+      </div>
+    </div>
+
+    <!-- 底部导航 -->
+    <div class="pitch-controls">
+      <div class="pitch-progress" id="pitchProgress"></div>
+      <div class="pitch-page" id="pitchPageNum">1 / 1</div>
+      <div class="pitch-hint" id="pitchHint">← → 空格移动焦点 · ↑↓ 切换兄弟节点 · ESC 退出</div>
+      <div class="pitch-nav">
+        <button class="nav-btn" id="btnPrev" onclick="prevSlide()">◀</button>
+        <button class="nav-btn" id="btnNext" onclick="nextSlide()">▶</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ======================================================================
+//  STATE
+// ======================================================================
+let currentData = null;
+let slides = [];               // DFS traversal order for navigation
+let currentFocus = 0;          // currently focused node index
+let totalNodes = 0;
+let fileName = '';
+let isInPitch = false;
+
+// Feature: Replay
+let isAutoPlaying = false;
+let autoPlaySpeed = 1;
+let autoPlayTimerId = null;
+const BASE_INTERVAL = 3000;
+
+// Feature: Cover
+let coverMode = false;
+
+// Progressive reveal
+let revealedNodes = new Set();
+
+// Feature: Brainstorm / Drawing
+let brainstormMode = false;
+let drawingState = { tool: 'pen', color: '#ff4444', size: 3 };
+let isDrawing = false;
+let drawCanvas = null;
+let drawCtx = null;
+let lastPos = { x: 0, y: 0 };
+
+// Feature: Quiz
+let quizMode = false;
+let quizPool = [];
+let quizReviewed = new Set();
+let quizAnswerRevealed = false;
+
+// Feature: Tags
+let slideTags = {};
+let tagPanelOpen = false;
+
+// ======================================================================
+//  FILE HANDLING
+// ======================================================================
+const uploadBox = document.getElementById('uploadBox');
+const fileInput = document.getElementById('fileInput');
+
+uploadBox.addEventListener('click', () => fileInput.click());
+uploadBox.addEventListener('dragover', (e) => { e.preventDefault(); uploadBox.classList.add('dragover'); });
+uploadBox.addEventListener('dragleave', () => uploadBox.classList.remove('dragover'));
+uploadBox.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadBox.classList.remove('dragover');
+  if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', (e) => { if (e.target.files.length > 0) handleFile(e.target.files[0]); });
+
+async function handleFile(file) {
+  if (!file.name.toLowerCase().endsWith('.xmind')) {
+    showError('请选择 .xmind 格式的文件');
+    return;
+  }
+  fileName = file.name.replace(/\.xmind$/i, '');
+  document.getElementById('loadingArea').style.display = 'flex';
+  document.getElementById('errorArea').style.display = 'none';
+
+  try {
+    const data = await parseXMind(file);
+    currentData = data;
+    resetAllState();
+    renderPreview(data);
+    generateSlides(data);
+    showPreview();
+  } catch (err) {
+    showError('解析失败：' + err.message);
+    console.error(err);
+  } finally {
+    document.getElementById('loadingArea').style.display = 'none';
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorArea');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function parseXMind(file) {
+  if (typeof JSZip === 'undefined') throw new Error('JSZip 库加载失败，请检查网络');
+  const zip = await JSZip.loadAsync(file);
+  let contentFile = zip.file('content.json');
+  if (!contentFile) {
+    const files = Object.keys(zip.files);
+    const contentPath = files.find(f => f.endsWith('content.json'));
+    if (contentPath) contentFile = zip.file(contentPath);
+  }
+  if (!contentFile) throw new Error('找不到 content.json，可能是不支持的格式');
+  const content = await contentFile.async('string');
+  const parsed = JSON.parse(content);
+  return Array.isArray(parsed) ? parsed[0] : parsed;
+}
+
+function resetAllState() {
+  stopAutoPlay();
+  exitCoverMode();
+  exitBrainstormMode();
+  exitQuizMode();
+  slideTags = {};
+  tagPanelOpen = false;
+  revealedNodes = new Set();
+  document.getElementById('tagPanel').classList.remove('open');
+  document.getElementById('tagPanelContent').innerHTML = '';
+  document.getElementById('tagInput').value = '';
+  if (drawCtx && drawCanvas) { drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); }
+}
+
+// ======================================================================
+//  PREVIEW TREE (unchanged)
+// ======================================================================
+function buildTreeHTML(topic, depth = 0) {
+  const title = (topic.title || '无标题').trim();
+  const children = topic.children?.attached || [];
+  const hasChildren = children.length > 0;
+
+  let cls = 'tree-node';
+  if (depth === 0) cls += ' node-root';
+  else if (hasChildren) cls += ' node-branch';
+  else cls += ' node-leaf';
+
+  const cardCls = `level-${Math.min(depth, 3)}`;
+
+  let html = `<div class="${cls}" data-level="${depth}">`;
+  html += `<div class="node-card ${cardCls}" title="${escapeAttr(title)}">${escapeHtml(title)}`;
+  if (hasChildren) html += `<span class="child-count-badge">${children.length}</span>`;
+  html += '</div>';
+  if (hasChildren) {
+    html += '<div class="node-children">';
+    children.forEach(child => { html += buildTreeHTML(child, depth + 1); });
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderPreview(sheet) {
+  const rootTopic = sheet.rootTopic;
+  const rootTitle = (rootTopic.title || fileName || '未命名导图').trim();
+  document.getElementById('previewTitle').textContent = rootTitle;
+  let nodeCount = 0;
+  function count(n) { nodeCount++; (n.children?.attached || []).forEach(count); }
+  count(rootTopic);
+  function maxDepth(n) {
+    const ch = n.children?.attached || [];
+    return ch.length === 0 ? 1 : 1 + Math.max(...ch.map(maxDepth));
+  }
+  document.getElementById('previewInfo').textContent = `· ${nodeCount} 个节点 · ${maxDepth(rootTopic)} 层`;
+  document.getElementById('mindmapTree').innerHTML = buildTreeHTML(rootTopic);
+}
+
+// ======================================================================
+//  PITCH TREE: Build
+// ======================================================================
+let pitchNodeIndex = 0;
+
+function buildPitchTreeHTML(topic, depth = 0) {
+  const idx = pitchNodeIndex++;
+  const title = (topic.title || '无标题').trim();
+  const children = topic.children?.attached || [];
+  const hasChildren = children.length > 0;
+  const note = (topic.notes?.plain?.content || '').trim();
+  const lvCls = `lv-${Math.min(depth, 4)}`;
+
+  let html = `<div class="pt-node" data-node-index="${idx}" data-depth="${depth}">`;
+
+  // Card wrapper (coverable)
+  html += `<div class="pt-card-wrapper coverable" id="pt-node-${idx}" data-node="${idx}" data-depth="${depth}">`;
+  html += `<div class="pt-card ${lvCls}">`;
+  html += escapeHtml(title);
+  if (hasChildren) html += `<span class="pt-badge">${children.length}</span>`;
+  html += '</div>';
+  if (note) html += `<div class="pt-note">${escapeHtml(note)}</div>`;
+  html += `<div class="cover-overlay hidden"><span class="cover-icon">🔒</span></div>`;
+  html += '</div>';
+
+  // Children column
+  if (hasChildren) {
+    html += '<div class="pt-children">';
+    children.forEach(child => { html += buildPitchTreeHTML(child, depth + 1); });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function renderPitchTree(sheet) {
+  pitchNodeIndex = 0;
+  const rootTopic = sheet.rootTopic;
+  const html = buildPitchTreeHTML(rootTopic);
+  document.getElementById('pitchTree').innerHTML = html;
+  totalNodes = pitchNodeIndex;
+}
+
+// ======================================================================
+//  PITCH TREE: Focus Navigation
+// ======================================================================
+function focusPitchNode(index) {
+  if (index < 0 || index >= totalNodes) return;
+  if (!revealedNodes.has(index)) return; // can't focus unrevealed nodes
+
+  // Remove old focus
+  const prev = document.querySelector('.pt-card-wrapper.focused');
+  if (prev) prev.classList.remove('focused');
+
+  // Add new focus
+  const el = document.getElementById(`pt-node-${index}`);
+  if (!el) return;
+  el.classList.add('focused');
+  currentFocus = index;
+
+  // Smooth scroll to node
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+
+  // Update UI
+  document.getElementById('pitchPageNum').textContent = `${index + 1} / ${totalNodes}`;
+  document.getElementById('pitchProgress').style.width = `${((index + 1) / totalNodes) * 100}%`;
+  document.getElementById('btnPrev').disabled = index === 0;
+  document.getElementById('btnNext').disabled = index === totalNodes - 1;
+
+  // Sync tags
+  syncNodeTagsToDOM(index);
+  // Update independent pitch panel
+  updatePitchPanel(index);
+  updatePitchHint();
+}
+
+// Reveal all children of a node and update visibility
+function revealChildrenOfNode(nodeIndex) {
+  revealedNodes.add(nodeIndex);
+  const nodeEl = document.querySelector(`.pt-node[data-node-index="${nodeIndex}"]`);
+  if (!nodeEl) return;
+  const childrenContainer = nodeEl.querySelector(':scope > .pt-children');
+  if (!childrenContainer) return;
+  const childNodes = childrenContainer.querySelectorAll(':scope > .pt-node');
+  childNodes.forEach(child => {
+    const idx = parseInt(child.getAttribute('data-node-index'));
+    if (!isNaN(idx)) revealedNodes.add(idx);
+  });
+  updateNodeVisibility();
+}
+
+// Show/hide nodes based on revealed set
+function updateNodeVisibility() {
+  document.querySelectorAll('#pitchTree .pt-node').forEach(node => {
+    const idx = parseInt(node.getAttribute('data-node-index'));
+    if (isNaN(idx)) return;
+    if (revealedNodes.has(idx)) {
+      node.classList.remove('unrevealed');
+      // Remove hidden-hint if it exists
+      const hint = node.querySelector('.pt-hidden-hint');
+      if (hint) hint.remove();
+      // Add hint if this node has hidden children
+      const childrenContainer = node.querySelector(':scope > .pt-children');
+      if (childrenContainer && childrenContainer.children.length > 0) {
+        const anyHidden = [...childrenContainer.children].some(
+          c => c.classList.contains('pt-node') && c.classList.contains('unrevealed')
+        );
+        const card = node.querySelector(':scope > .pt-card-wrapper > .pt-card');
+        if (anyHidden && card) {
+          const existingHint = card.querySelector('.pt-hidden-hint');
+          if (!existingHint) {
+            const hiddenCount = [...childrenContainer.children].filter(
+              c => c.classList.contains('pt-node') && c.classList.contains('unrevealed')
+            ).length;
+            const hint = document.createElement('span');
+            hint.className = 'pt-hidden-hint';
+            hint.textContent = `+${hiddenCount}`;
+            card.appendChild(hint);
+          }
         }
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+      }
+    } else {
+      node.classList.add('unrevealed');
+    }
+  });
+}
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+// Update the independent pitch panel on the right side
+function updatePitchPanel(index) {
+  if (index < 0 || index >= slides.length) return;
+  const slide = slides[index];
 
-        // --- 全局变量 ---
-        let scene, camera, renderer, particles, geometry, material;
-        let controls;
-        let originalAutoRotateSpeed = 1.0; 
-        let time = 0; 
-        
-        const DEFAULT_FOV = 55;
+  // Breadcrumb
+  const breadEl = document.getElementById('pspBreadcrumb');
+  if (slide.path.length > 0) {
+    breadEl.innerHTML = slide.path.map(p => escapeHtml(p)).join(' <span style="color:#475569">/</span> ');
+    breadEl.style.display = '';
+  } else {
+    breadEl.style.display = 'none';
+  }
 
-        // 粒子总数 40000
-        const particleCount = 40000; 
-        const targets = {     
-            cubicHeart: [],
-            flower: [],
-            saturn: [],
-            buddha: [],
-            fireworks: [],
-            galaxy: [],
-            infinity: [], 
-            ringPhotos: [], 
-            ringTexts: [],
-            nameYangR: [], 
-            nameYangY: []  
-        };
-        
-        // 模型定义数据 (用于生成UI)
-        const models = [
-            { id: 'saturn', name: '🪐 土星', color: '#ff007f' },
-            { id: 'infinity', name: '♾️ 无限', color: '#ff007f' },
-            { id: 'galaxy', name: '🌌 星系', color: '#9370db' },
-            { id: 'cubicHeart', name: '💖 爱心', color: '#ff69b4' },
-            { id: 'flower', name: '🌻 繁花', color: '#ffcc00' },
-            { id: 'buddha', name: '🧘 禅', color: '#00ffff' },
-            { id: 'fireworks', name: '✨ 烟花', color: '#ffffff' }
-        ];
+  // Title
+  const titleEl = document.getElementById('pspTitle');
+  titleEl.textContent = slide.title;
+  titleEl.className = slide.isRoot ? 'psp-title root-title' : 'psp-title';
 
-        let currentShape = 'saturn'; 
-        let handInteractionFactor = 0; 
-        let prevHandInteractionFactor = 0; 
-        let targetColor = new THREE.Color(0xff007f); 
-        let baseOpacity = 0.76; 
-        
-        let detectedFingerCount = 0; 
-        let photoMesh; 
+  // Subtitle (root only)
+  const subEl = document.getElementById('pspSubtitle');
+  if (slide.isRoot && slide.children.length > 0) {
+    subEl.textContent = `${slide.children.length} 个分支主题`;
+    subEl.style.display = '';
+  } else {
+    subEl.style.display = 'none';
+  }
 
-        // 彗尾
-        const cometTailParticleCount = 40; 
-        let cometTailParticles, cometTailGeometry, cometTailMaterial;
-        const cometTailPositions = new Float32Array(cometTailParticleCount * 3);
-        const cometTailColors = new Float32Array(cometTailParticleCount * 3);
-        let cometTailIndex = 0; 
-        const cometTailColor = new THREE.Color(0xffa500); 
-        let cometTailWorldPosition = new THREE.Vector3(); 
+  // Children cards
+  const childrenEl = document.getElementById('pspChildren');
+  if (slide.children.length > 0) {
+    let cardsHtml = '';
+    slide.children.forEach((child, j) => {
+      cardsHtml += `<div class="psp-child-card coverable" id="psp-child-${j}" data-psp-child="${j}">
+        <div>${escapeHtml(child)}</div>
+        <div class="cover-overlay hidden"><span class="cover-icon">🔒</span></div>
+      </div>`;
+    });
+    childrenEl.innerHTML = cardsHtml;
+    childrenEl.style.display = '';
+    document.getElementById('pspEmpty').style.display = 'none';
+  } else {
+    childrenEl.innerHTML = '';
+    childrenEl.style.display = 'none';
+    document.getElementById('pspEmpty').style.display = slide.isRoot ? '' : 'none';
+  }
 
-        // 流星
-        let meteorParticles, meteorGeometry, meteorMaterial;
-        const meteorCount = 500; 
-        const meteorAttributes = {
-            positions: new Float32Array(meteorCount * 3),
-            velocities: [],
-            lifespans: new Float32Array(meteorCount),
-            maxLifespans: new Float32Array(meteorCount)
-        };
+  // Note
+  const noteArea = document.getElementById('pspNoteArea');
+  const noteText = document.getElementById('pspNoteText');
+  if (slide.note) {
+    noteText.textContent = slide.note;
+    noteArea.style.display = '';
+  } else {
+    noteArea.style.display = 'none';
+  }
+}
 
-        // 状态机
-        const STATE = { IDLE: 0, HOVERING: 1, FOCUSED: 2 };
-        let interactionState = STATE.IDLE;
-        let activeRingIndex = -1; 
-        
-        let hoverStartTime = 0;      
-        let movementStartTime = 0;   
-        let lastCometPos = new THREE.Vector3();
-        
-        const HOVER_THRESHOLD = 2.0; 
-        const RESET_THRESHOLD = 2.0; 
-        const MOVEMENT_SENSITIVITY = 0.5; 
+function getFocusedEl() {
+  return document.getElementById(`pt-node-${currentFocus}`);
+}
 
-        const loveWords = ["❤12.7❤", "无限的爱意", "星河长明", "与你同行", "爱如繁星"];
-        const ringColors = [0xffa500, 0xff007f, 0x9370db, 0x00ffff, 0xffffff]; 
+function getFocusedNodeEl() {
+  const cardEl = document.getElementById(`pt-node-${currentFocus}`);
+  if (!cardEl) return null;
+  return cardEl.closest('.pt-node');
+}
 
-        // --- 初始化入口 ---
-        function initThree() {
-            const container = document.createElement('div');
-            document.body.appendChild(container);
+function getNodeChildrenContainer(nodeEl) {
+  if (!nodeEl) return null;
+  return nodeEl.querySelector(':scope > .pt-children');
+}
 
-            scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x080010, 0.002); 
-            
-            const ambient = new THREE.AmbientLight(0xffffff, 0.2);
-            scene.add(ambient);
-            const pointLight = new THREE.PointLight(0xffffff, 1.5, 500);
-            pointLight.position.set(50, 50, 50);
-            scene.add(pointLight);
+function nextSlide() {
+  if (isAutoPlaying) stopAutoPlay();
+  const nodeEl = getFocusedNodeEl();
+  if (!nodeEl) return;
 
-            camera = new THREE.PerspectiveCamera(DEFAULT_FOV, window.innerWidth / window.innerHeight, 1, 2000);
-            camera.position.z = 120;
-            camera.position.y = 80;
+  // 1) If current node has hidden children → reveal them and go to first child
+  const children = getNodeChildrenContainer(nodeEl);
+  if (children && children.children.length > 0) {
+    const anyHidden = [...children.children].some(
+      c => c.classList.contains('pt-node') && c.classList.contains('unrevealed')
+    );
+    if (anyHidden) {
+      revealChildrenOfNode(currentFocus);
+      const firstChild = children.querySelector(':scope > .pt-node');
+      if (firstChild) {
+        const idx = parseInt(firstChild.getAttribute('data-node-index'));
+        if (!isNaN(idx) && revealedNodes.has(idx)) { focusPitchNode(idx); return; }
+      }
+    }
+    // 2) Children already revealed → go to first child
+    const firstVisible = [...children.children].find(
+      c => c.classList.contains('pt-node') && !c.classList.contains('unrevealed')
+    );
+    if (firstVisible) {
+      const idx = parseInt(firstVisible.getAttribute('data-node-index'));
+      if (!isNaN(idx)) { focusPitchNode(idx); return; }
+    }
+  }
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            container.appendChild(renderer.domElement);
+  // 3) No children → go to next revealed sibling, or next revealed node in DFS
+  // Try next sibling first
+  const nextSib = findNextRevealedSibling(nodeEl);
+  if (nextSib !== null) { focusPitchNode(nextSib); return; }
 
-            controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.autoRotate = true; 
-            controls.autoRotateSpeed = originalAutoRotateSpeed;
-            originalAutoRotateSpeed = controls.autoRotateSpeed; 
-            
-            loadPhotos(); 
-            generateShapes();
-            generateInteractionShapes(); 
-            createParticles();
-            createCometTailParticles(); 
-            createMeteorShower(); 
-            scene.add(cometTailParticles); 
-            
-            // 初始化 UI
-            initCustomUI();
-            initDebugGUI(); // 原 GUI 作为调试用
-            
-            window.addEventListener('resize', onWindowResize);
-            document.getElementById('fullscreen-btn').addEventListener('click', () => {
-                if (!document.fullscreenElement) document.documentElement.requestFullscreen();
-                else document.exitFullscreen();
-            });
+  // Go up to parent and try next sibling
+  let current = nodeEl;
+  while (current) {
+    const parentChildren = current.parentElement;
+    if (!parentChildren || !parentChildren.classList.contains('pt-children')) break;
+    const parentNode = parentChildren.parentElement;
+    if (!parentNode || !parentNode.classList.contains('pt-node')) break;
+    const parentNext = findNextRevealedSibling(parentNode);
+    if (parentNext !== null) { focusPitchNode(parentNext); return; }
+    current = parentNode;
+  }
 
-            document.getElementById('back-btn').addEventListener('click', resetToUniverse);
-            
-            // 添加按键监听：'K' 键控制调试面板
-            window.addEventListener('keydown', (e) => {
-                if(e.key === 'k' || e.key === 'K') {
-                    const uiContainer = document.getElementById('ui-container');
-                    if(uiContainer.style.display === 'none' || uiContainer.style.display === '') {
-                        uiContainer.style.display = 'block';
-                        console.log("Debug UI Enabled");
-                    } else {
-                        uiContainer.style.display = 'none';
-                        console.log("Debug UI Disabled");
-                    }
-                }
-            });
+  // Fallback: next revealed in DFS order
+  for (let i = currentFocus + 1; i < totalNodes; i++) {
+    if (revealedNodes.has(i)) { focusPitchNode(i); return; }
+  }
+}
 
-            animate();
+function findNextRevealedSibling(nodeEl) {
+  let next = nodeEl.nextElementSibling;
+  while (next) {
+    if (next.classList.contains('pt-node') && !next.classList.contains('unrevealed')) {
+      return parseInt(next.getAttribute('data-node-index'));
+    }
+    next = next.nextElementSibling;
+  }
+  return null;
+}
+
+function prevSlide() {
+  if (isAutoPlaying) stopAutoPlay();
+  // Go to previous revealed node in DFS
+  for (let i = currentFocus - 1; i >= 0; i--) {
+    if (revealedNodes.has(i)) { focusPitchNode(i); return; }
+  }
+}
+
+// Sibling navigation (up/down) — only among revealed siblings
+function focusNextSibling() {
+  const nodeEl = getFocusedNodeEl();
+  if (!nodeEl) return;
+  const next = nodeEl.nextElementSibling;
+  if (next && next.classList.contains('pt-node') && !next.classList.contains('unrevealed')) {
+    const idx = parseInt(next.getAttribute('data-node-index'));
+    if (!isNaN(idx)) { if (isAutoPlaying) stopAutoPlay(); focusPitchNode(idx); }
+  }
+}
+function focusPrevSibling() {
+  const nodeEl = getFocusedNodeEl();
+  if (!nodeEl) return;
+  const prev = nodeEl.previousElementSibling;
+  if (prev && prev.classList.contains('pt-node') && !prev.classList.contains('unrevealed')) {
+    const idx = parseInt(prev.getAttribute('data-node-index'));
+    if (!isNaN(idx)) { if (isAutoPlaying) stopAutoPlay(); focusPitchNode(idx); }
+  }
+}
+
+// Focus parent (left arrow)
+function focusParent() {
+  const nodeEl = getFocusedNodeEl();
+  if (!nodeEl) return;
+  const parentChildren = nodeEl.parentElement;
+  if (!parentChildren || !parentChildren.classList.contains('pt-children')) return;
+  const parentNode = parentChildren.parentElement;
+  if (!parentNode || !parentNode.classList.contains('pt-node')) return;
+  const idx = parseInt(parentNode.getAttribute('data-node-index'));
+  if (!isNaN(idx)) { if (isAutoPlaying) stopAutoPlay(); focusPitchNode(idx); }
+}
+
+// Focus first child (right arrow) — reveal first
+function focusFirstChild() {
+  const nodeEl = getFocusedNodeEl();
+  if (!nodeEl) return;
+  // Reveal children first if hidden
+  const children = getNodeChildrenContainer(nodeEl);
+  if (children && children.children.length > 0) {
+    const anyHidden = [...children.children].some(
+      c => c.classList.contains('pt-node') && c.classList.contains('unrevealed')
+    );
+    if (anyHidden) revealChildrenOfNode(currentFocus);
+  }
+  // Focus first visible child
+  if (children) {
+    const firstVisible = [...children.children].find(
+      c => c.classList.contains('pt-node') && !c.classList.contains('unrevealed')
+    );
+    if (firstVisible) {
+      const idx = parseInt(firstVisible.getAttribute('data-node-index'));
+      if (!isNaN(idx)) { if (isAutoPlaying) stopAutoPlay(); focusPitchNode(idx); }
+    }
+  }
+}
+
+function updatePitchHint() {
+  const hint = document.getElementById('pitchHint');
+  if (quizMode) hint.textContent = '测验模式 · ESC 退出';
+  else if (coverMode) hint.textContent = '遮盖模式 · 点击节点切换遮盖 · ESC 退出';
+  else if (brainstormMode) hint.textContent = '涂鸦模式 · ESC 退出涂鸦';
+  else if (isAutoPlaying) hint.textContent = '自动播放中 · 手动操作暂停';
+  else hint.textContent = '空格/→ 展开下一步 · ↑↓ 兄弟节点 · ← 回父节点 · 点击节点展开 · ESC 退出';
+}
+
+// ======================================================================
+//  HELPERS
+// ======================================================================
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+function escapeAttr(text) {
+  return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ======================================================================
+//  SLIDES ARRAY (DFS navigation order only)
+// ======================================================================
+function generateSlides(sheet) {
+  slides = [];
+  function traverse(node, path = []) {
+    const title = (node.title || '无标题').trim();
+    const children = node.children?.attached || [];
+    const note = node.notes?.plain?.content || '';
+    slides.push({
+      title,
+      path: path.map(p => (p.title || '无标题').trim()),
+      level: path.length,
+      isRoot: path.length === 0,
+      children: children.map(c => (c.title || '无标题').trim()).filter(t => t),
+      note: note.trim()
+    });
+    children.forEach(child => traverse(child, [...path, node]));
+  }
+  traverse(sheet.rootTopic);
+}
+
+// ======================================================================
+//  PAGE SWITCHING
+// ======================================================================
+function startPitch() {
+  isInPitch = true;
+  renderPitchTree(currentData);
+  // Progressive reveal: start with only root visible
+  revealedNodes = new Set([0]);
+  updateNodeVisibility();
+  document.getElementById('pitchPage').style.display = 'block';
+  focusPitchNode(0);
+  initCanvasOnce();
+  updatePitchPanel(0);
+  // Auto-play starts by default
+  startAutoPlay();
+  // Re-sync all tags into the DOM tree
+  for (const [idx] of Object.entries(slideTags)) {
+    syncNodeTagsToDOM(parseInt(idx));
+  }
+}
+
+function exitPitch() {
+  // ESC priority: quiz > cover > brainstorm > exit pitch
+  if (quizMode) { exitQuiz(); return; }
+  if (coverMode) { exitCoverMode(); return; }
+  if (brainstormMode) { exitBrainstormMode(); return; }
+
+  isInPitch = false;
+  stopAutoPlay();
+  exitQuizMode();
+  exitCoverMode();
+  exitBrainstormMode();
+  document.getElementById('pitchPage').style.display = 'none';
+}
+
+function showPreview() {
+  document.getElementById('uploadPage').style.display = 'none';
+  document.getElementById('previewPage').style.display = 'flex';
+}
+
+function showUpload() {
+  document.getElementById('previewPage').style.display = 'none';
+  document.getElementById('uploadPage').style.display = 'flex';
+  resetAllState();
+  currentData = null;
+  slides = [];
+  totalNodes = 0;
+  currentFocus = 0;
+  fileInput.value = '';
+}
+
+// ======================================================================
+//  FEATURE: REPLAY / AUTO-PLAY
+// ======================================================================
+function toggleAutoPlay() { isAutoPlaying ? stopAutoPlay() : startAutoPlay(); }
+
+function startAutoPlay() {
+  isAutoPlaying = true;
+  document.getElementById('autoPlayDot').style.display = 'inline-block';
+  document.getElementById('autoPlayLabel').textContent = '⏸ 暂停';
+  updatePitchHint();
+  scheduleNextSlide();
+}
+
+function stopAutoPlay() {
+  isAutoPlaying = false;
+  clearTimeout(autoPlayTimerId);
+  autoPlayTimerId = null;
+  document.getElementById('autoPlayDot').style.display = 'none';
+  document.getElementById('autoPlayLabel').textContent = '▶ 播放';
+  updatePitchHint();
+}
+
+function scheduleNextSlide() {
+  if (!isAutoPlaying) return;
+  const interval = BASE_INTERVAL / autoPlaySpeed;
+  autoPlayTimerId = setTimeout(() => {
+    const prevFocus = currentFocus;
+    nextSlide();
+    // If focus didn't change (no more nodes to advance), stop
+    if (currentFocus === prevFocus && currentFocus === totalNodes - 1) {
+      // Check if there are still hidden descendants to reveal
+      const nodeEl = getFocusedNodeEl();
+      let hasHidden = false;
+      if (nodeEl) {
+        const children = getNodeChildrenContainer(nodeEl);
+        if (children) {
+          hasHidden = [...children.children].some(
+            c => c.classList.contains('pt-node') && c.classList.contains('unrevealed')
+          );
         }
+      }
+      if (!hasHidden) { stopAutoPlay(); return; }
+    }
+    if (currentFocus !== prevFocus) {
+      scheduleNextSlide();
+    } else {
+      // Advance happened but focus same? Keep going
+      scheduleNextSlide();
+    }
+  }, interval);
+}
 
-        // --- 初始化自定义 UI ---
-        function initCustomUI() {
-            const menuContainer = document.getElementById('model-menu');
-            
-            models.forEach(model => {
-                const btn = document.createElement('button');
-                btn.className = 'model-btn';
-                btn.innerText = model.name;
-                if(model.id === currentShape) btn.classList.add('active');
-                
-                btn.onclick = () => {
-                    // 更新激活状态
-                    document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    
-                    // 切换模型逻辑
-                    currentShape = model.id;
-                    targetColor.set(model.color);
-                    resetToUniverse(); // 切换模型时自动重置视角和状态
-                };
-                
-                menuContainer.appendChild(btn);
-            });
+function setAutoPlaySpeed(speed, btnEl) {
+  autoPlaySpeed = speed;
+  document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+  if (isAutoPlaying) { clearTimeout(autoPlayTimerId); scheduleNextSlide(); }
+}
+
+// ======================================================================
+//  FEATURE: COVER / UNCOVER
+// ======================================================================
+function toggleCoverMode() { coverMode ? exitCoverMode() : enterCoverMode(); }
+
+function enterCoverMode() {
+  coverMode = true;
+  document.getElementById('btnCoverMode').textContent = '🔓 退出遮盖';
+  document.getElementById('btnCoverMode').classList.add('btn-danger');
+  document.getElementById('btnCoverMode').classList.remove('btn-secondary');
+  document.getElementById('btnCoverAll').style.display = '';
+  document.getElementById('btnUncoverAll').style.display = '';
+  document.getElementById('coverModeIndicator').classList.add('active');
+  updatePitchHint();
+}
+
+function exitCoverMode() {
+  coverMode = false;
+  document.getElementById('btnCoverMode').textContent = '🔒 遮盖';
+  document.getElementById('btnCoverMode').classList.remove('btn-danger');
+  document.getElementById('btnCoverMode').classList.add('btn-secondary');
+  document.getElementById('btnCoverAll').style.display = 'none';
+  document.getElementById('btnUncoverAll').style.display = 'none';
+  document.getElementById('coverModeIndicator').classList.remove('active');
+  updatePitchHint();
+}
+
+// Cover all children in the independent pitch panel
+function coverAll() {
+  const cards = document.querySelectorAll('#pspChildren .psp-child-card.coverable');
+  cards.forEach(el => {
+    el.classList.add('covered');
+    const overlay = el.querySelector('.cover-overlay');
+    if (overlay) overlay.classList.remove('hidden');
+  });
+  // Also cover note
+  const noteArea = document.getElementById('pspNoteArea');
+  if (noteArea && noteArea.style.display !== 'none') {
+    noteArea.classList.add('covered');
+    const noteOverlay = noteArea.querySelector('.cover-overlay');
+    if (noteOverlay) noteOverlay.classList.remove('hidden');
+  }
+}
+
+// Uncover all children in the independent pitch panel
+function uncoverAll() {
+  const cards = document.querySelectorAll('#pspChildren .psp-child-card.coverable');
+  cards.forEach(el => {
+    el.classList.remove('covered');
+    const overlay = el.querySelector('.cover-overlay');
+    if (overlay) overlay.classList.add('hidden');
+  });
+  const noteArea = document.getElementById('pspNoteArea');
+  if (noteArea) {
+    noteArea.classList.remove('covered');
+    const noteOverlay = noteArea.querySelector('.cover-overlay');
+    if (noteOverlay) noteOverlay.classList.add('hidden');
+  }
+}
+
+function toggleElementCover(el) {
+  const overlay = el.querySelector('.cover-overlay');
+  if (!overlay) return;
+  const hidden = overlay.classList.contains('hidden');
+  if (hidden) { overlay.classList.remove('hidden'); el.classList.add('covered'); }
+  else { overlay.classList.add('hidden'); el.classList.remove('covered'); }
+}
+
+// ======================================================================
+//  FEATURE: BRAINSTORM / DRAWING (unchanged core logic)
+// ======================================================================
+function toggleBrainstormMode() { brainstormMode ? exitBrainstormMode() : enterBrainstormMode(); }
+
+function enterBrainstormMode() {
+  brainstormMode = true;
+  document.getElementById('drawCanvas').classList.add('active');
+  document.getElementById('drawToolbar').classList.add('active');
+  document.getElementById('btnBrainstorm').textContent = '🎨 退出涂鸦';
+  document.getElementById('btnBrainstorm').classList.add('btn-danger');
+  document.getElementById('btnBrainstorm').classList.remove('btn-secondary');
+  resizeCanvas();
+  updatePitchHint();
+}
+
+function exitBrainstormMode() {
+  brainstormMode = false;
+  isDrawing = false;
+  clearCanvas();
+  document.getElementById('drawCanvas').classList.remove('active');
+  document.getElementById('drawToolbar').classList.remove('active');
+  document.getElementById('btnBrainstorm').textContent = '🎨 涂鸦';
+  document.getElementById('btnBrainstorm').classList.remove('btn-danger');
+  document.getElementById('btnBrainstorm').classList.add('btn-secondary');
+  updatePitchHint();
+}
+
+function initCanvasOnce() {
+  if (drawCanvas) return;
+  drawCanvas = document.getElementById('drawCanvas');
+  drawCtx = drawCanvas.getContext('2d');
+  drawCtx.lineCap = 'round';
+  drawCtx.lineJoin = 'round';
+  resizeCanvas();
+  drawCanvas.addEventListener('mousedown', startDrawing);
+  drawCanvas.addEventListener('mousemove', draw);
+  drawCanvas.addEventListener('mouseup', stopDrawing);
+  drawCanvas.addEventListener('mouseleave', stopDrawing);
+  drawCanvas.addEventListener('touchstart', startDrawing, { passive: false });
+  drawCanvas.addEventListener('touchmove', draw, { passive: false });
+  drawCanvas.addEventListener('touchend', stopDrawing);
+  drawCanvas.addEventListener('touchcancel', stopDrawing);
+  window.addEventListener('resize', resizeCanvas);
+}
+
+function resizeCanvas() {
+  if (!drawCanvas) return;
+  const tmp = document.createElement('canvas');
+  tmp.width = drawCanvas.width; tmp.height = drawCanvas.height;
+  const tmpCtx = tmp.getContext('2d');
+  tmpCtx.drawImage(drawCanvas, 0, 0);
+  drawCanvas.width = window.innerWidth;
+  drawCanvas.height = window.innerHeight;
+  if (drawCtx && tmp.width > 0) drawCtx.drawImage(tmp, 0, 0);
+  if (drawCtx) { drawCtx.lineCap = 'round'; drawCtx.lineJoin = 'round'; }
+}
+
+function getPos(e) {
+  const rect = drawCanvas.getBoundingClientRect();
+  if (e.touches && e.touches.length > 0)
+    return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function startDrawing(e) {
+  if (!brainstormMode) return;
+  e.preventDefault();
+  isDrawing = true;
+  const pos = getPos(e);
+  lastPos = pos;
+  drawCtx.globalCompositeOperation = drawingState.tool === 'eraser' ? 'destination-out' : 'source-over';
+  drawCtx.fillStyle = drawingState.tool === 'eraser' ? 'rgba(0,0,0,1)' : drawingState.color;
+  drawCtx.beginPath();
+  drawCtx.arc(pos.x, pos.y, drawingState.size / 2, 0, Math.PI * 2);
+  drawCtx.fill();
+}
+
+function draw(e) {
+  if (!isDrawing || !brainstormMode) return;
+  e.preventDefault();
+  const pos = getPos(e);
+  drawCtx.globalCompositeOperation = drawingState.tool === 'eraser' ? 'destination-out' : 'source-over';
+  drawCtx.strokeStyle = drawingState.color;
+  drawCtx.lineWidth = drawingState.size;
+  drawCtx.beginPath();
+  drawCtx.moveTo(lastPos.x, lastPos.y);
+  drawCtx.lineTo(pos.x, pos.y);
+  drawCtx.stroke();
+  lastPos = pos;
+}
+
+function stopDrawing() { isDrawing = false; }
+function setDrawTool(tool) {
+  drawingState.tool = tool;
+  document.getElementById('drawToolPen').classList.toggle('active', tool === 'pen');
+  document.getElementById('drawToolEraser').classList.toggle('active', tool === 'eraser');
+}
+function setDrawColor(color, btnEl) {
+  drawingState.color = color;
+  document.querySelectorAll('.draw-color-dot').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+}
+function setDrawSize(size, btnEl) {
+  drawingState.size = size;
+  document.querySelectorAll('.draw-size-dot').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+}
+function clearCanvas() {
+  if (!drawCtx || !drawCanvas) return;
+  drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+}
+
+// ======================================================================
+//  FEATURE: QUIZ MODE
+// ======================================================================
+function toggleQuizMode() { quizMode ? exitQuiz() : startQuiz(); }
+
+function startQuiz() {
+  quizPool = []; quizReviewed = new Set(); quizAnswerRevealed = false;
+  for (let i = 1; i < totalNodes; i++) quizPool.push(i);
+  if (quizPool.length === 0) { alert('需要至少一个非根节点才能使用测验模式'); quizMode = false; return; }
+  quizMode = true;
+  // Bypass progressive reveal: reveal all nodes for quiz
+  for (let i = 0; i < totalNodes; i++) revealedNodes.add(i);
+  updateNodeVisibility();
+  document.getElementById('quizPanel').classList.add('active');
+  document.getElementById('btnQuiz').textContent = '❌ 退出测验';
+  document.getElementById('btnQuiz').classList.add('btn-danger');
+  document.getElementById('btnQuiz').classList.remove('btn-secondary');
+  updateQuizProgress();
+  nextQuizSlide();
+}
+
+function nextQuizSlide() {
+  quizAnswerRevealed = false;
+  const remaining = quizPool.filter(i => !quizReviewed.has(i));
+  if (remaining.length === 0) quizReviewed.clear();
+  const pool = quizPool.filter(i => !quizReviewed.has(i));
+  const randomIdx = pool[Math.floor(Math.random() * pool.length)];
+  quizReviewed.add(randomIdx);
+  focusPitchNode(randomIdx);
+  setTimeout(() => coverAll(), 150);
+  updateQuizProgress();
+  updatePitchHint();
+}
+
+function revealQuizAnswer() {
+  if (!quizMode) return;
+  quizAnswerRevealed = true;
+  uncoverAll();
+}
+
+function updateQuizProgress() {
+  document.getElementById('quizProgress').innerHTML =
+    `已复习 <strong>${quizReviewed.size}</strong> / <strong>${quizPool.length}</strong> 题`;
+}
+
+function exitQuiz() {
+  quizMode = false; quizAnswerRevealed = false;
+  uncoverAll();
+  document.getElementById('quizPanel').classList.remove('active');
+  document.getElementById('btnQuiz').textContent = '❓ 测验';
+  document.getElementById('btnQuiz').classList.remove('btn-danger');
+  document.getElementById('btnQuiz').classList.add('btn-secondary');
+  updatePitchHint();
+}
+
+function exitQuizMode() {
+  if (quizMode) {
+    quizMode = false; quizAnswerRevealed = false; uncoverAll();
+    document.getElementById('quizPanel').classList.remove('active');
+    document.getElementById('btnQuiz').textContent = '❓ 测验';
+    document.getElementById('btnQuiz').classList.remove('btn-danger');
+    document.getElementById('btnQuiz').classList.add('btn-secondary');
+  }
+}
+
+// ======================================================================
+//  FEATURE: TAGS
+// ======================================================================
+function handleTagInput(event) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const input = document.getElementById('tagInput');
+    const tag = input.value.trim();
+    if (tag) { addTag(currentFocus, tag); input.value = ''; }
+  }
+  if (event.key.startsWith('Arrow') || event.key === ' ') event.stopPropagation();
+}
+
+function addTag(nodeIndex, tag) {
+  if (!slideTags[nodeIndex]) slideTags[nodeIndex] = [];
+  if (slideTags[nodeIndex].includes(tag)) return;
+  slideTags[nodeIndex].push(tag);
+  syncNodeTagsToDOM(nodeIndex);
+  if (tagPanelOpen) renderTagPanel();
+}
+
+function removeTag(nodeIndex, tag) {
+  if (!slideTags[nodeIndex]) return;
+  slideTags[nodeIndex] = slideTags[nodeIndex].filter(t => t !== tag);
+  if (slideTags[nodeIndex].length === 0) delete slideTags[nodeIndex];
+  syncNodeTagsToDOM(nodeIndex);
+  if (tagPanelOpen) renderTagPanel();
+}
+
+function syncNodeTagsToDOM(nodeIndex) {
+  const cardWrapper = document.getElementById(`pt-node-${nodeIndex}`);
+  if (!cardWrapper) return;
+
+  // Remove existing tags
+  const existing = cardWrapper.querySelector('.node-tags');
+  if (existing) existing.remove();
+
+  const tags = slideTags[nodeIndex];
+  if (!tags || tags.length === 0) return;
+
+  const tagsDiv = document.createElement('div');
+  tagsDiv.className = 'node-tags';
+  tags.forEach(tag => {
+    const chip = document.createElement('span');
+    chip.className = 'tag-chip';
+    chip.innerHTML = `${escapeHtml(tag)} <span class="tag-remove">×</span>`;
+    chip.querySelector('.tag-remove').addEventListener('click', (e) => {
+      e.stopPropagation(); e.preventDefault();
+      removeTag(nodeIndex, tag);
+    });
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation(); e.preventDefault();
+      jumpToNodeByTag(nodeIndex);
+    });
+    tagsDiv.appendChild(chip);
+  });
+  cardWrapper.appendChild(tagsDiv);
+}
+
+function jumpToNodeByTag(nodeIndex) {
+  focusPitchNode(nodeIndex);
+  const cardWrapper = document.getElementById(`pt-node-${nodeIndex}`);
+  if (cardWrapper) {
+    const card = cardWrapper.querySelector('.pt-card');
+    if (card) { card.classList.add('jump-highlight'); setTimeout(() => card.classList.remove('jump-highlight'), 2100); }
+  }
+}
+
+function openTagPanel() {
+  tagPanelOpen = !tagPanelOpen;
+  const panel = document.getElementById('tagPanel');
+  if (tagPanelOpen) { panel.classList.add('open'); renderTagPanel(); }
+  else panel.classList.remove('open');
+}
+
+function closeTagPanel() {
+  tagPanelOpen = false;
+  document.getElementById('tagPanel').classList.remove('open');
+}
+
+function renderTagPanel() {
+  const content = document.getElementById('tagPanelContent');
+  const entries = [];
+  for (const [nodeIdx, tags] of Object.entries(slideTags)) {
+    if (parseInt(nodeIdx) >= totalNodes) continue;
+    const slide = slides[parseInt(nodeIdx)];
+    if (!slide) continue;
+    tags.forEach(tag => entries.push({ tag, nodeIndex: parseInt(nodeIdx), title: slide.title }));
+  }
+  if (entries.length === 0) {
+    content.innerHTML = '<div class="tag-panel-empty">暂无标签<br><span style="font-size:11px">在上方输入标签名后按回车添加</span></div>';
+    return;
+  }
+  const grouped = {};
+  entries.forEach(e => { if (!grouped[e.tag]) grouped[e.tag] = []; grouped[e.tag].push(e); });
+  let html = '';
+  for (const [tag, items] of Object.entries(grouped)) {
+    html += `<div style="margin-bottom:10px;"><div style="color:#a5b4fc;font-weight:600;font-size:12px;margin-bottom:4px;">🏷 ${escapeHtml(tag)} (${items.length})</div>`;
+    items.forEach(item => {
+      html += `<div class="tag-panel-item" onclick="jumpToNodeByTag(${item.nodeIndex});closeTagPanel();">
+        <span class="tag-panel-slide" title="${escapeAttr(item.title)}">${escapeHtml(item.title)}</span>
+        <span style="color:#475569;font-size:10px;flex-shrink:0;margin-left:8px;">#${item.nodeIndex + 1}</span>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  content.innerHTML = html;
+}
+
+// ======================================================================
+//  KEYBOARD HANDLER
+// ======================================================================
+document.addEventListener('keydown', (e) => {
+  if (!isInPitch) return;
+
+  // Tag input active: block navigation keys
+  if (document.activeElement === document.getElementById('tagInput')) {
+    if (e.key === 'Escape') { document.getElementById('tagInput').blur(); e.preventDefault(); }
+    return;
+  }
+
+  // ESC priority
+  if (e.key === 'Escape') { e.preventDefault(); exitPitch(); return; }
+
+  // Quiz mode: no navigation
+  if (quizMode) return;
+
+  // Cover mode: no slide navigation
+  if (coverMode) return;
+
+  // Tree navigation
+  if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    focusFirstChild();
+  } else if (e.key === ' ' || e.key === 'PageDown') {
+    e.preventDefault();
+    nextSlide();
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    focusNextSibling();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    focusPrevSibling();
+  } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+    e.preventDefault();
+    focusParent();
+  }
+});
+
+// ======================================================================
+//  CLICK HANDLER (tree interaction)
+// ======================================================================
+document.getElementById('pitchTree').addEventListener('click', (e) => {
+  if (!isInPitch) return;
+  if (e.target.closest('.pitch-controls') || e.target.closest('.pitch-top-controls')) return;
+
+  // Quiz mode: clicking covered nodes reveals them
+  if (quizMode) {
+    const coverableEl = e.target.closest('.coverable');
+    if (coverableEl) {
+      const overlay = coverableEl.querySelector('.cover-overlay');
+      if (overlay && !overlay.classList.contains('hidden')) {
+        toggleElementCover(coverableEl);
+        // Check if all covered children are revealed
+        const nodeEl = getFocusedNodeEl();
+        if (nodeEl) {
+          const children = getNodeChildrenContainer(nodeEl);
+          if (children) {
+            const allOverlays = children.querySelectorAll(':scope > .pt-node > .pt-card-wrapper .cover-overlay');
+            const allHidden = [...allOverlays].every(o => o.classList.contains('hidden'));
+            if (allHidden) quizAnswerRevealed = true;
+          }
         }
+      }
+    }
+    return;
+  }
 
-        // --- 初始化调试 GUI (隐藏) ---
-        function initDebugGUI() {
-            const gui = new GUI({ 
-                container: document.getElementById('ui-container'), 
-                title: '调试控制台 (按K隐藏)', 
-                closed: false 
-            }); 
-            
-            const params = {
-                particleSize: 1.1,
-                resetCamera: () => {
-                    camera.position.set(0, 80, 120); 
-                    camera.fov = DEFAULT_FOV;
-                    camera.updateProjectionMatrix(); 
-                    controls.target.set(0, 0, 0); 
-                    controls.update();
-                }
-            };
-            
-            // 移除了模型选择，保留参数调整
-            const debugFolder = gui.addFolder('参数调试');
-            debugFolder.add(params, 'particleSize', 0.5, 5).name('粒子大小').onChange(val => material.size = val);
-            debugFolder.addColor({ color: '#' + targetColor.getHexString() }, 'color').name('强制颜色').onChange(val => targetColor.set(val));
-            
-            const cameraFolder = gui.addFolder('视角参数');
-            cameraFolder.add(camera.position, 'x', -200, 200).listen();
-            cameraFolder.add(camera.position, 'y', -200, 200).listen();
-            cameraFolder.add(camera.position, 'z', 0, 400).listen();
-            cameraFolder.add(camera, 'fov', 10, 120).onChange(() => camera.updateProjectionMatrix()).listen();
-            cameraFolder.add(params, 'resetCamera').name('重置视角');
+  // Cover mode: toggle cover on clicked node
+  if (coverMode) {
+    const coverableEl = e.target.closest('.coverable');
+    if (coverableEl) { toggleElementCover(coverableEl); }
+    return;
+  }
+
+  // Normal mode: click on a node card to focus it
+  if (e.target.closest('.tag-chip') || e.target.closest('.tag-remove') ||
+      e.target.closest('.tag-panel') || e.target.closest('.cover-overlay')) return;
+
+  if (brainstormMode && e.target.closest('#drawCanvas')) return;
+
+  const cardWrapper = e.target.closest('.pt-card-wrapper');
+  if (cardWrapper) {
+    const nodeEl = cardWrapper.closest('.pt-node');
+    if (nodeEl) {
+      const idx = parseInt(nodeEl.getAttribute('data-node-index'));
+      if (!isNaN(idx) && revealedNodes.has(idx)) {
+        if (isAutoPlaying) stopAutoPlay();
+        // Click: reveal children of this node (if hidden), then focus
+        const children = getNodeChildrenContainer(nodeEl);
+        if (children && children.children.length > 0) {
+          const anyHidden = [...children.children].some(
+            c => c.classList.contains('pt-node') && c.classList.contains('unrevealed')
+          );
+          if (anyHidden) revealChildrenOfNode(idx);
         }
+        focusPitchNode(idx);
+      }
+    }
+    return;
+  }
 
-        function resetToUniverse() {
-            interactionState = STATE.IDLE;
-            activeRingIndex = -1;
-            movementStartTime = 0;
-            controls.autoRotate = true;
-            camera.fov = DEFAULT_FOV; 
-            camera.updateProjectionMatrix(); 
-            if (meteorParticles) meteorParticles.visible = false;
-        }
+  // Click on empty space → next node
+  nextSlide();
+});
 
-        function loadPhotos() {
-            const textureLoader = new THREE.TextureLoader();
-            const frontTexture = textureLoader.load('https://raw.githubusercontent.com/YoungR006/YoungR006.github.io/main/1.jpg'); 
-            const backTexture = textureLoader.load('https://raw.githubusercontent.com/YoungR006/YoungR006.github.io/main/2.jpg');
-            const photoGeometry = new THREE.PlaneGeometry(30, 30);
-            const frontMaterial = new THREE.MeshBasicMaterial({ map: frontTexture, side: THREE.FrontSide });
-            const backMaterial = new THREE.MeshBasicMaterial({ map: backTexture, side: THREE.FrontSide });
-            const backMesh = new THREE.Mesh(photoGeometry, backMaterial);
-            backMesh.rotation.y = Math.PI;
+// ======================================================================
+//  PITCH PANEL CLICK HANDLER (cover + quiz in independent panel)
+// ======================================================================
+document.getElementById('pitchSlidePanel').addEventListener('click', (e) => {
+  if (!isInPitch) return;
 
-            photoMesh = new THREE.Group();
-            photoMesh.add(new THREE.Mesh(photoGeometry, frontMaterial));
-            photoMesh.add(backMesh);
-            photoMesh.position.set(0, 0, 0); 
-            scene.add(photoMesh);
-            photoMesh.rotationSpeed = 0.005;
-        }
+  // Quiz mode: clicking covered elements in the panel reveals them
+  if (quizMode) {
+    const coverableEl = e.target.closest('.coverable');
+    if (coverableEl) {
+      const overlay = coverableEl.querySelector('.cover-overlay');
+      if (overlay && !overlay.classList.contains('hidden')) {
+        toggleElementCover(coverableEl);
+        // Check if all covered are now revealed
+        const allOverlays = document.querySelectorAll('#pspChildren .cover-overlay, #pspNoteArea .cover-overlay');
+        const allHidden = [...allOverlays].every(o => o.classList.contains('hidden'));
+        if (allHidden) quizAnswerRevealed = true;
+      }
+    }
+    return;
+  }
 
-        function createStringParticles(text) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = 400; canvas.height = 200;
-            ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.font = 'bold 80px "Microsoft YaHei", sans-serif'; 
-            ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(text, canvas.width/2, canvas.height/2);
-            const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-            const points = [];
-            for(let y=0; y<canvas.height; y+=2) { 
-                for(let x=0; x<canvas.width; x+=2) {
-                    if(data[(y * canvas.width + x) * 4] > 128) { 
-                        points.push((x - canvas.width/2) * 0.5, (canvas.height/2 - y) * 0.5, 0);
-                    }
-                }
-            }
-            return points;
-        }
+  // Cover mode: toggle cover on clicked panel cards
+  if (coverMode) {
+    const coverableEl = e.target.closest('.coverable');
+    if (coverableEl) { toggleElementCover(coverableEl); }
+    return;
+  }
+});
 
-        function createRectParticles(width, height) {
-            const points = [];
-            const stepsX = 140; const stepsY = 140;
-            for (let i = 0; i < stepsX; i++) {
-                for (let j = 0; j < stepsY; j++) {
-                    points.push((i / stepsX - 0.5) * width, (j / stepsY - 0.5) * height, 0);
-                }
-            }
-            return points;
-        }
+// Close tag panel on outside click
+document.addEventListener('click', (e) => {
+  if (!tagPanelOpen) return;
+  if (!e.target.closest('.tag-panel') && !e.target.closest('#tagGroup')) {
+    closeTagPanel();
+  }
+});
+</script>
 
-        function generateInteractionShapes() {
-            for (let i = 0; i < 5; i++) {
-                const textPoints = createStringParticles(loveWords[i]);
-                const textTarget = [];
-                for(let k=0; k<particleCount; k++) {
-                    const pIndex = (k % (textPoints.length/3)) * 3;
-                    textTarget.push(textPoints[pIndex], textPoints[pIndex+1], textPoints[pIndex+2]);
-                }
-                targets.ringTexts.push(textTarget);
-
-                const photoPoints = createRectParticles(80, 60); 
-                const photoTarget = [];
-                for(let k=0; k<particleCount; k++) {
-                     const pIndex = (k % (photoPoints.length/3)) * 3;
-                     photoTarget.push(photoPoints[pIndex], photoPoints[pIndex+1], photoPoints[pIndex+2] + (Math.random()-0.5)*2);
-                }
-                targets.ringPhotos.push(photoTarget);
-            }
-            const createNameTarget = (name, targetArray) => {
-                const points = createStringParticles(name);
-                for(let k=0; k<particleCount; k++) {
-                    const pIndex = (k % (points.length/3)) * 3;
-                    targetArray.push(points[pIndex], points[pIndex+1], points[pIndex+2]);
-                }
-            };
-            createNameTarget("杨瑞智", targets.nameYangR);
-            createNameTarget("杨雅淇", targets.nameYangY);
-        }
-
-        function generateShapes() {
-            const tempVec = new THREE.Vector3();
-            for (let i = 0; i < particleCount; i++) {
-                // Cubic Heart
-                let t = Math.random() * Math.PI * 2;
-                let x = 16 * Math.pow(Math.sin(t), 3);
-                let y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
-                let z = (Math.random() - 0.5) * 20;
-                targets.cubicHeart.push(x * 1.5, y * 1.5, z);
-
-                // Flower
-                const f_theta = Math.random() * Math.PI * 2;
-                const f_phi = Math.random() * Math.PI;
-                const radius_f = 40 * Math.sin(3 * f_theta) * Math.sin(f_phi) + 15;
-                tempVec.setFromSphericalCoords(radius_f, f_phi, f_theta);
-                targets.flower.push(tempVec.x, tempVec.y, tempVec.z);
-
-                // Saturn
-                const coreCount = 15000;
-                const outerSatelliteCount = 500;
-                const ringAndSatelliteCount = particleCount - coreCount;
-                const ringCount = ringAndSatelliteCount - outerSatelliteCount;
-                const groupSize = ringCount / 5;
-                const ringStart = coreCount;
-                const outerSatelliteStart = coreCount + ringCount;
-                if (i < ringStart) {
-                    const phi = Math.acos(-1 + (2 * i) / ringStart);
-                    const theta = Math.sqrt(ringStart * Math.PI) * phi;
-                    tempVec.setFromSphericalCoords(35, phi, theta);
-                    targets.saturn.push(tempVec.x, tempVec.y, tempVec.z);
-                } else if (i < outerSatelliteStart) {
-                    const particleIndexInRing = i - ringStart; 
-                    let angle = Math.random() * Math.PI * 2;
-                    let dist = 0;
-                    let y_offset = (Math.random()-0.5) * 4; 
-                    const baseRadius = 45;
-                    const groupSpacing = 10.0; 
-                    let groupIndex = Math.floor(particleIndexInRing / groupSize);
-                    switch (groupIndex) {
-                        case 0: dist = baseRadius + Math.random() * 2; break;
-                        case 1: dist = baseRadius + groupSpacing * 1 + Math.random() * 3; y_offset=(Math.random()-0.5)*6; break;
-                        case 2: dist = baseRadius + groupSpacing * 2 + Math.random() * 2; break;
-                        case 3: dist = baseRadius + groupSpacing * 3 + Math.random() * 1.5; y_offset=(Math.random()-0.5)*7; angle+=(Math.random()-0.5)*0.5; break;
-                        case 4: dist = baseRadius + groupSpacing * 4 + Math.random() * 3.5; y_offset=(Math.random()-0.5)*8; angle+=(Math.random()-0.5)*1.0; break;
-                        default: dist = 60;
-                    }
-                    targets.saturn.push(Math.cos(angle) * dist, y_offset, Math.sin(angle) * dist);
-                } else {
-                    const angle = Math.random() * Math.PI * 2;
-                    const dist = 90 + Math.random() * 10; 
-                    targets.saturn.push(Math.cos(angle) * dist, (Math.random()-0.5)*8, Math.sin(angle) * dist);
-                }
-
-                // Buddha
-                if (i < particleCount * 0.15) {
-                    tempVec.randomDirection().multiplyScalar(8).add(new THREE.Vector3(0, 18, 0));
-                    targets.buddha.push(tempVec.x, tempVec.y, tempVec.z);
-                } else if (i < particleCount * 0.5) {
-                    const r = 12; const h = Math.random() * 20; const ang = Math.random()*Math.PI*2;
-                    targets.buddha.push(Math.cos(ang)*r*(1-h/30), h-5, Math.sin(ang)*r*(1-h/30));
-                } else {
-                    const ang = Math.random()*Math.PI*2; const r = 20+Math.random()*15;
-                    targets.buddha.push(Math.cos(ang)*r, -8+Math.random()*5, Math.sin(ang)*r*0.8);
-                }
-
-                // Fireworks
-                tempVec.randomDirection().multiplyScalar(50 + Math.random() * 150);
-                targets.fireworks.push(tempVec.x, tempVec.y, tempVec.z);
-
-                // Galaxy
-                const arms = 5;
-                const pointInArm = Math.floor(i / arms) / (particleCount / arms); 
-                const distance = pointInArm * 70 + 5; 
-                const angleGalaxy = pointInArm * Math.PI * 2 * 3 + ((i % arms) * Math.PI * 2 / arms) + 0.5 / distance;
-                targets.galaxy.push(
-                    Math.cos(angleGalaxy) * distance + (Math.random()-0.5) * pointInArm * 20,
-                    (Math.random()-0.5) * (15 - distance * 0.1) + (Math.random()-0.5) * pointInArm * 10, 
-                    Math.sin(angleGalaxy) * distance + (Math.random()-0.5) * pointInArm * 20
-                );
-
-                // Infinity
-                const inf_t = (i / particleCount) * Math.PI * 4; 
-                const inf_denom = 1 + Math.sin(inf_t) * Math.sin(inf_t);
-                targets.infinity.push(
-                    35 * Math.cos(inf_t) / inf_denom,
-                    35 * Math.sin(inf_t) * Math.cos(inf_t) / inf_denom,
-                    (Math.random() - 0.5) * 5 
-                );
-            }
-        }
-
-        function createParticles() {
-            geometry = new THREE.BufferGeometry();
-            const initialPositions = new Float32Array(particleCount * 3);
-            const colors = new Float32Array(particleCount * 3);
-            for (let i = 0; i < particleCount * 3; i++) {
-                initialPositions[i] = (Math.random() - 0.5) * 100;
-                colors[i] = 1.0; 
-            }
-            geometry.setAttribute('position', new THREE.BufferAttribute(initialPositions, 3));
-            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-            const circleSprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png'); 
-            material = new THREE.PointsMaterial({
-                size: 1.1, map: circleSprite, vertexColors: true, blending: THREE.AdditiveBlending, 
-                depthWrite: false, transparent: true, opacity: baseOpacity 
-            });
-            particles = new THREE.Points(geometry, material);
-            scene.add(particles);
-        }
-
-        function createCometTailParticles() {
-            cometTailGeometry = new THREE.BufferGeometry();
-            for (let i = 0; i < cometTailParticleCount * 3; i++) { cometTailPositions[i] = 0; cometTailColors[i] = cometTailColor.r; }
-            cometTailGeometry.setAttribute('position', new THREE.BufferAttribute(cometTailPositions, 3));
-            cometTailGeometry.setAttribute('color', new THREE.BufferAttribute(cometTailColors, 3));
-            const circleSprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png'); 
-            cometTailMaterial = new THREE.PointsMaterial({
-                size: 3, map: circleSprite, vertexColors: true, blending: THREE.AdditiveBlending,
-                depthWrite: false, transparent: true, opacity: 0.9 
-            });
-            cometTailParticles = new THREE.Points(cometTailGeometry, cometTailMaterial);
-        }
-        
-        function createMeteorShower() {
-            meteorGeometry = new THREE.BufferGeometry();
-            const initialSizes = new Float32Array(meteorCount); 
-            meteorGeometry.setAttribute('position', new THREE.BufferAttribute(meteorAttributes.positions, 3));
-            meteorGeometry.setAttribute('size', new THREE.BufferAttribute(initialSizes, 1)); 
-            const starSprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png');
-            meteorMaterial = new THREE.PointsMaterial({
-                size: 2.0, map: starSprite, color: 0x99ccff, blending: THREE.AdditiveBlending,
-                depthWrite: false, transparent: true, sizeAttenuation: true 
-            });
-            meteorParticles = new THREE.Points(meteorGeometry, meteorMaterial);
-            meteorParticles.visible = false; 
-            scene.add(meteorParticles);
-            for (let i = 0; i < meteorCount; i++) {
-                meteorAttributes.velocities.push(new THREE.Vector3());
-                meteorGeometry.attributes.size.array[i] = 0.0; 
-                resetMeteor(i);
-            }
-        }
-        
-        function resetMeteor(i) {
-            const i3 = i * 3;
-            meteorAttributes.positions[i3] = (Math.random() - 0.5) * 400; 
-            meteorAttributes.positions[i3 + 1] = (Math.random() - 0.5) * 50; 
-            meteorAttributes.positions[i3 + 2] = -200 - Math.random() * 50; 
-            meteorAttributes.velocities[i].set((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 5, 100 + Math.random() * 100);
-            const maxLife = 4.0 + Math.random() * 2.0; 
-            meteorAttributes.maxLifespans[i] = maxLife;
-            meteorAttributes.lifespans[i] = maxLife;
-            meteorGeometry.attributes.size.array[i] = 0.0;
-        }
-
-        function updateMeteorShower(dt) {
-            if (meteorParticles.visible === false) return;
-            const positions = meteorParticles.geometry.attributes.position.array;
-            const sizes = meteorParticles.geometry.attributes.size.array; 
-            for (let i = 0; i < meteorCount; i++) {
-                const i3 = i * 3;
-                meteorAttributes.lifespans[i] -= dt;
-                if (meteorAttributes.lifespans[i] < 0 || positions[i3+2] > 200) resetMeteor(i);
-                const vel = meteorAttributes.velocities[i];
-                positions[i3] += vel.x * dt; positions[i3 + 1] += vel.y * dt; positions[i3 + 2] += vel.z * dt;
-                const normalizedLife = meteorAttributes.lifespans[i] / meteorAttributes.maxLifespans[i]; 
-                sizes[i] = (normalizedLife > 0.8 ? (1 - normalizedLife) * 5 : (normalizedLife < 0.2 ? normalizedLife * 5 : 1.0)) * 3.0;
-            }
-            meteorParticles.geometry.attributes.position.needsUpdate = true;
-            meteorParticles.geometry.attributes.size.needsUpdate = true;
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            const dt = 0.016; 
-            time += 0.01; 
-            if (controls.enabled) controls.update();
-            const hintEl = document.getElementById('hint-text');
-            
-            if (meteorParticles && meteorParticles.visible) updateMeteorShower(dt);
-
-            if (currentShape === 'saturn') {
-                if (interactionState === STATE.IDLE || interactionState === STATE.HOVERING) {
-                    if(meteorParticles && meteorParticles.visible) meteorParticles.visible = false; 
-                    const distXZ = Math.sqrt(cometTailWorldPosition.x * cometTailWorldPosition.x + cometTailWorldPosition.z * cometTailWorldPosition.z);
-                    let hoveredRing = -1;
-                    if (distXZ > 40 && distXZ < 52) hoveredRing = 0;
-                    else if (distXZ >= 52 && distXZ < 62) hoveredRing = 1;
-                    else if (distXZ >= 62 && distXZ < 72) hoveredRing = 2;
-                    else if (distXZ >= 72 && distXZ < 82) hoveredRing = 3;
-                    else if (distXZ >= 82 && distXZ < 95) hoveredRing = 4;
-
-                    if (hoveredRing !== -1) {
-                        if (hoveredRing === activeRingIndex) {
-                            if (Date.now() - hoverStartTime > HOVER_THRESHOLD * 1000) {
-                                interactionState = STATE.FOCUSED;
-                                controls.autoRotate = false; 
-                                hintEl.innerText = "比2:杨瑞智 | 比3:爱心 | 比4:杨雅淇 | 比5:流星";
-                                hintEl.style.opacity = 1;
-                                setTimeout(() => hintEl.style.opacity = 0, 5000);
-                            }
-                        } else {
-                            activeRingIndex = hoveredRing;
-                            hoverStartTime = Date.now();
-                            interactionState = STATE.HOVERING;
-                        }
-                    } else {
-                        interactionState = STATE.IDLE;
-                        activeRingIndex = -1;
-                    }
-                } else if (interactionState === STATE.FOCUSED) {
-                    const isGesturing = Math.abs(handInteractionFactor - prevHandInteractionFactor) > 0.01;
-                    const movement = cometTailWorldPosition.distanceTo(lastCometPos);
-                    if (!isGesturing && movement > MOVEMENT_SENSITIVITY) {
-                        if (movementStartTime === 0) movementStartTime = Date.now();
-                        else if (Date.now() - movementStartTime > RESET_THRESHOLD * 1000) resetToUniverse();
-                    } else {
-                        movementStartTime = 0; 
-                    }
-                }
-            } else {
-                interactionState = STATE.IDLE; activeRingIndex = -1; 
-                if(meteorParticles) meteorParticles.visible = false; 
-            }
-            
-            lastCometPos.copy(cometTailWorldPosition);
-            prevHandInteractionFactor = handInteractionFactor; 
-
-            const positions = particles.geometry.attributes.position.array;
-            const colors = particles.geometry.attributes.color.array;
-            
-            let currentTargetArr;
-            let currentTargetColor = targetColor;
-            let targetOpacity = baseOpacity; 
-
-            if (interactionState === STATE.FOCUSED && activeRingIndex !== -1) {
-                if (detectedFingerCount === 5) {
-                    controls.autoRotate = true; camera.position.set(0,0,100);
-                    currentTargetArr = targets.fireworks; targetOpacity = 0.7; 
-                    if(meteorParticles) meteorParticles.visible = true;
-                    hintEl.innerText = "⭐ 散作流星 ⭐"; hintEl.style.opacity = 1;
-                } else if (detectedFingerCount === 4) {
-                    camera.position.set(0, 0, 400);
-                    currentTargetArr = targets.nameYangY; targetOpacity = 1.0;
-                    if(meteorParticles) meteorParticles.visible = false;
-                    hintEl.innerText = "杨雅淇"; hintEl.style.opacity = 1;
-                } else if (detectedFingerCount === 3) {
-                    camera.position.set(0, 0, 400);
-                    currentTargetArr = targets.cubicHeart; targetOpacity = 1.0;
-                    if(meteorParticles) meteorParticles.visible = false;
-                    hintEl.innerText = "❤️"; hintEl.style.opacity = 1;
-                } else if (detectedFingerCount === 2) {
-                    camera.position.set(0, 0, 400);
-                    currentTargetArr = targets.nameYangR; targetOpacity = 1.0;
-                    if(meteorParticles) meteorParticles.visible = false;
-                    hintEl.innerText = "杨瑞智"; hintEl.style.opacity = 1;
-                } else {
-                    camera.position.set(0, 0, 400);
-                    currentTargetArr = targets.ringTexts[activeRingIndex]; targetOpacity = 1.0; 
-                    if(meteorParticles) meteorParticles.visible = false;
-                    hintEl.innerText = loveWords[activeRingIndex]; hintEl.style.opacity = 1;
-                    if (Date.now() - hoverStartTime > 4000 && hintEl.style.opacity > 0) hintEl.style.opacity -= 0.01;
-                }
-                currentTargetColor = new THREE.Color(ringColors[activeRingIndex]); 
-            } else {
-                currentTargetArr = targets[currentShape];
-                targetOpacity = baseOpacity;
-                hintEl.style.opacity = 0; 
-            }
-            
-            material.opacity += (targetOpacity - material.opacity) * 0.1;
-            const rotAngle = time * 0.005;
-            const cosRot = Math.cos(rotAngle);
-            const sinRot = Math.sin(rotAngle);
-            const speed = (currentShape === 'fireworks') ? 0.02 : 0.1; 
-            
-            // Satrun Colors
-            const groupColors = [new THREE.Color(0xffa500), new THREE.Color(0xff007f), new THREE.Color(0x9370db), new THREE.Color(0x00ffff), new THREE.Color(0xffffff)];
-
-            for (let i = 0; i < particleCount; i++) {
-                const ix = i * 3;
-                let tx = currentTargetArr[ix]; let ty = currentTargetArr[ix+1]; let tz = currentTargetArr[ix+2];
-
-                if (interactionState !== STATE.FOCUSED && ['infinity','cubicHeart','saturn'].includes(currentShape)) {
-                    const ox = tx; const oz = tz;
-                    tx = ox * cosRot - oz * sinRot; tz = ox * sinRot + oz * cosRot;
-                }
-
-                let pColor = currentTargetColor;
-                if (currentShape === 'saturn' && interactionState !== STATE.FOCUSED) {
-                    if (i < 15000) pColor = targetColor;
-                    else if (i < 15000 + (particleCount-15000-500)) {
-                        const gIdx = Math.floor((i - 15000) / ((particleCount-15500)/5));
-                        if (gIdx < 5) pColor = groupColors[gIdx];
-                    } else pColor = new THREE.Color(0xffa500);
-                }
-
-                positions[ix] += (tx - positions[ix]) * speed;
-                positions[ix+1] += (ty - positions[ix+1]) * speed;
-                positions[ix+2] += (tz - positions[ix+2]) * speed;
-                colors[ix] += (pColor.r - colors[ix]) * 0.05;
-                colors[ix+1] += (pColor.g - colors[ix+1]) * 0.05;
-                colors[ix+2] += (pColor.b - colors[ix+2]) * 0.05;
-            }
-
-            particles.geometry.attributes.position.needsUpdate = true;
-            particles.geometry.attributes.color.needsUpdate = true;
-
-            if (cometTailParticles) {
-                const ctColors = cometTailParticles.geometry.attributes.color.array;
-                let headIndex = (cometTailIndex === 0) ? cometTailParticleCount - 1 : cometTailIndex - 1;
-                for (let i = 0; i < cometTailParticleCount; i++) {
-                    let distance = (headIndex - i + cometTailParticleCount) % cometTailParticleCount;
-                    const alpha = Math.pow(Math.max(0, 1 - distance / cometTailParticleCount), 8); 
-                    ctColors[i * 3] = cometTailColor.r + (1 - cometTailColor.r) * alpha; 
-                    ctColors[i * 3 + 1] = cometTailColor.g + (1 - cometTailColor.g) * alpha;
-                    ctColors[i * 3 + 2] = cometTailColor.b + (1 - cometTailColor.b) * alpha;
-                }
-                cometTailParticles.geometry.attributes.color.needsUpdate = true;
-            }
-            if (photoMesh) photoMesh.rotation.y += photoMesh.rotationSpeed || 0.005;
-            renderer.render(scene, camera);
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function onResults(results) {
-            document.getElementById('loading').style.display = 'none';
-            const numHands = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
-            if (numHands > 0) {
-                const landmarks = results.multiHandLandmarks[0]; 
-                const p0 = landmarks[0]; const p5 = landmarks[5]; 
-                const D_norm = Math.sqrt(Math.pow(p0.x - p5.x, 2) + Math.pow(p0.y - p5.y, 2)) * 1.5; 
-                // Hand Open Factor
-                const D_tips = Math.sqrt(Math.pow(landmarks[12].x - landmarks[20].x, 2) + Math.pow(landmarks[12].y - landmarks[20].y, 2));
-                let factor = D_tips / D_norm; factor = Math.max(0, Math.min(1, factor * 2)); 
-                handInteractionFactor += (factor - handInteractionFactor) * 0.1; 
-                // Finger Counting
-                const isFingerUp = (tipIdx, pipIdx) => {
-                    const dTip = Math.sqrt(Math.pow(landmarks[tipIdx].x - landmarks[0].x, 2) + Math.pow(landmarks[tipIdx].y - landmarks[0].y, 2));
-                    const dPip = Math.sqrt(Math.pow(landmarks[pipIdx].x - landmarks[0].x, 2) + Math.pow(landmarks[pipIdx].y - landmarks[0].y, 2));
-                    return dTip > dPip * 1.1; 
-                };
-                let count = 0;
-                if (isFingerUp(4, 2)) count++; // Thumb
-                if (isFingerUp(8, 6)) count++; // Index
-                if (isFingerUp(12, 10)) count++; // Middle
-                if (isFingerUp(16, 14)) count++; // Ring
-                if (isFingerUp(20, 18)) count++; // Pinky
-                detectedFingerCount = count;
-
-                if (cometTailParticles) {
-                    const worldX = -(landmarks[8].x - 0.5) * 160; 
-                    const worldY = -(landmarks[8].y - 0.5) * 120; 
-                    const worldZ = (landmarks[8].z - 0.5) * 40; 
-                    cometTailWorldPosition.set(worldX, worldY, worldZ); 
-                    const ctPositions = cometTailParticles.geometry.attributes.position.array;
-                    ctPositions[cometTailIndex * 3] = worldX; ctPositions[cometTailIndex * 3 + 1] = worldY; ctPositions[cometTailIndex * 3 + 2] = worldZ; 
-                    cometTailIndex = (cometTailIndex + 1) % cometTailParticleCount; 
-                    cometTailParticles.geometry.attributes.position.needsUpdate = true;
-                }
-            } else {
-                handInteractionFactor += (0 - handInteractionFactor) * 0.05; detectedFingerCount = 0; 
-                if (cometTailParticles) {
-                    const ctPositions = cometTailParticles.geometry.attributes.position.array;
-                    for(let i = 0; i < cometTailParticleCount * 3; i += 3) { ctPositions[i+2] += 0.5; ctPositions[i+1] -= 0.1; }
-                    cometTailParticles.geometry.attributes.position.needsUpdate = true;
-                }
-            }
-        }
-
-        const videoElement = document.getElementsByClassName('input_video')[0];
-        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-        hands.onResults(onResults);
-        const cameraUtils = new Camera(videoElement, { onFrame: async () => await hands.send({image: videoElement}), width: 320, height: 240 });
-
-        initThree();
-        cameraUtils.start();
-
-    </script>
 </body>
 </html>
