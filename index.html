@@ -3,8 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Young Rich</title>
+<title>Young rich</title>
+<!-- JSZip 支持解析 .xmind -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<!-- KaTeX 支持解析与渲染 LaTeX 公式 -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
 <style>
 /* ===== 全局基础 ===== */
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -67,7 +71,7 @@ input[type="file"] { display: none; }
 .btn {
   padding: 7px 16px; border-radius: 8px; border: none; cursor: pointer;
   font-size: 13px; font-weight: 500; transition: all 0.2s;
-  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap;
 }
 .btn-primary { background: #6366f1; color: white; }
 .btn-primary:hover { background: #818cf8; }
@@ -75,7 +79,7 @@ input[type="file"] { display: none; }
 .btn-secondary:hover { background: rgba(255,255,255,0.12); }
 .btn-danger { background: rgba(239,68,68,0.15); color: #fca5a5; }
 .btn-danger:hover { background: rgba(239,68,68,0.25); }
-.btn-sm { padding: 4px 10px; font-size: 11px; border-radius: 6px; }
+.btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 6px; }
 
 .preview-body {
   flex: 1; overflow: auto; position: relative; background: #0f0f23; padding: 40px;
@@ -89,7 +93,7 @@ input[type="file"] { display: none; }
 .tree-node { display: flex; align-items: center; position: relative; }
 .node-card {
   padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 500;
-  color: #e2e8f0; white-space: nowrap; max-width: 280px;
+  color: #e2e8f0; white-space: nowrap; max-width: 380px;
   overflow: hidden; text-overflow: ellipsis; position: relative; z-index: 2;
   cursor: default; transition: all 0.2s; display: flex; align-items: center; gap: 8px;
 }
@@ -130,31 +134,29 @@ input[type="file"] { display: none; }
 .node-children .tree-node:last-child::after { bottom: 50%; }
 .node-children .tree-node:only-child::after { display: none; }
 
-.empty-state { text-align: center; color: #475569; padding: 60px 20px; }
-.empty-state h3 { font-size: 18px; margin-bottom: 8px; color: #64748b; }
-
 /* ===== 演示页 ===== */
 #pitchPage {
   display: none; position: fixed; inset: 0; background: #0a0a1a; z-index: 9999; overflow: hidden;
 }
 
-/* 顶部控制栏 */
+/* ===== 悬浮在左侧的控制栏 ===== */
 .pitch-top-controls {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
-  padding: 8px 16px;
-  background: linear-gradient(to bottom, rgba(10,10,26,0.98), rgba(10,10,26,0.85) 80%, transparent);
-  pointer-events: none;
+  position: fixed; top: 50px; left: 20px; z-index: 100;
+  display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+  padding: 12px; width: 145px;
+  background: rgba(12, 12, 30, 0.92); border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px; backdrop-filter: blur(16px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5); pointer-events: auto;
 }
-.pitch-top-controls > * { pointer-events: auto; }
-.control-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.08); margin: 0 4px; }
-.control-group { display: flex; align-items: center; gap: 3px; }
+.control-divider { width: 100%; height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0; }
+.control-group { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.speed-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 100%; }
 
 /* 速度按钮 */
 .speed-btn {
-  padding: 3px 9px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.08);
+  padding: 3px 0; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.04); color: #94a3b8; cursor: pointer;
-  font-size: 10px; transition: all 0.2s; font-weight: 500;
+  font-size: 10px; transition: all 0.2s; font-weight: 500; text-align: center;
 }
 .speed-btn.active, .speed-btn:hover { background: #6366f1; border-color: #6366f1; color: white; }
 .speed-btn:hover:not(.active) { background: rgba(99,102,241,0.3); }
@@ -167,9 +169,9 @@ input[type="file"] { display: none; }
   50% { opacity: 0.3; transform: scale(1.8); }
 }
 
-/* ===== 演示树视口（左侧，给面板留空间）===== */
+/* ===== 演示树视口 ===== */
 .pitch-viewport {
-  position: absolute; top: 48px; left: 0; right: 440px; bottom: 64px;
+  position: absolute; top: 0; left: 180px; bottom: 64px;
   overflow: auto; scroll-behavior: smooth;
   scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent;
 }
@@ -185,24 +187,30 @@ input[type="file"] { display: none; }
 
 /* ===== Pitch Slide Panel（右侧独立演示面板）===== */
 .pitch-slide-panel {
-  position: absolute; top: 48px; right: 0; bottom: 64px; width: 440px;
+  position: absolute; top: 0; right: 0; bottom: 64px;
   background: rgba(12,12,30,0.97); border-left: 1px solid #1e1e3f;
   display: flex; flex-direction: column; align-items: center;
   justify-content: flex-start; padding: 60px 28px 40px;
-  z-index: 20; overflow-y: auto;
-  backdrop-filter: blur(10px);
+  z-index: 20; overflow-y: auto; backdrop-filter: blur(10px);
 }
+/* 面板拖拽调节把手 */
+.panel-resize-handle {
+  position: absolute; left: -4px; top: 0; bottom: 0; width: 8px;
+  cursor: col-resize; z-index: 25; background: transparent;
+  transition: background 0.2s;
+}
+.panel-resize-handle:hover,
+.panel-resize-handle.active { background: rgba(99,102,241,0.4); }
 .psp-breadcrumb {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   margin-bottom: 32px; font-size: 12px; color: #64748b; flex-wrap: wrap;
 }
 .psp-title {
-  font-size: 32px; font-weight: 800; line-height: 1.3; margin-bottom: 24px;
-  color: #f1f5f9; text-align: center; word-break: break-word;
-  width: 100%;
+  font-size: 28px; font-weight: 800; line-height: 1.3; margin-bottom: 24px;
+  color: #f1f5f9; text-align: center; word-break: break-word; width: 100%;
 }
 .psp-title.root-title {
-  font-size: 38px;
+  font-size: 36px;
   background: linear-gradient(135deg, #e2e8f0, #94a3b8);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
@@ -215,36 +223,64 @@ input[type="file"] { display: none; }
   background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
   border-radius: 12px; padding: 12px 20px; font-size: 15px; color: #cbd5e1;
   backdrop-filter: blur(10px); transition: all 0.25s; word-break: break-word;
-  max-width: 380px; cursor: default;
-  position: relative;
+  max-width: 380px; cursor: default; position: relative; overflow: hidden;
 }
 .psp-child-card:hover {
   background: rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.25);
   transform: translateY(-2px);
 }
-.psp-child-card .cover-overlay { border-radius: 12px; }
 .psp-note-area {
   width: 100%; margin-top: 20px; font-size: 14px; color: #94a3b8; line-height: 1.7;
   text-align: center; padding: 12px 20px;
-  background: rgba(255,255,255,0.02); border-radius: 10px;
-  position: relative;
+  background: rgba(255,255,255,0.02); border-radius: 10px; position: relative; overflow: hidden;
 }
-.psp-note-area .cover-overlay { border-radius: 10px; }
 .psp-empty-hint { color: #334155; font-size: 13px; margin-top: 24px; }
 
-/* 树节点 */
-.pt-node {
-  display: flex; align-items: center; position: relative;
-  transition: filter 0.3s;
+/* ===== 搜索 ===== */
+.search-group { display: flex; align-items: center; gap: 2px; position: relative; }
+.search-input {
+  width: 100px; padding: 5px 10px; border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05);
+  color: #e2e8f0; font-size: 12px; outline: none; transition: border 0.2s;
 }
+.search-input:focus { border-color: #f59e0b; width: 150px; }
+.search-input::placeholder { color: #475569; }
+.search-count {
+  font-size: 10px; color: #64748b; position: absolute; right: 4px; top: -14px;
+  pointer-events: none; white-space: nowrap;
+}
+.search-highlight {
+  outline: 2px solid #f59e0b !important;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ===== 缩放 ===== */
+.zoom-group { display: flex; align-items: center; gap: 2px; }
+.zoom-btn {
+  width: 26px; height: 26px; border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04);
+  color: #94a3b8; cursor: pointer; font-size: 14px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; line-height: 1;
+}
+.zoom-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+.zoom-label {
+  font-size: 11px; color: #94a3b8; min-width: 36px; text-align: center;
+  cursor: pointer; user-select: none;
+}
+.zoom-label:hover { color: white; }
+
+/* 树节点 */
+.pt-node { display: flex; align-items: center; position: relative; }
 .pt-card-wrapper {
   position: relative; flex-shrink: 0; cursor: pointer;
-  transition: transform 0.25s ease;
+  transition: transform 0.25s ease; border-radius: 12px; overflow: hidden;
 }
 .pt-card-wrapper:hover { transform: scale(1.03); }
 .pt-card {
   padding: 12px 22px; border-radius: 12px; font-weight: 600; color: #e2e8f0;
-  white-space: nowrap; max-width: 300px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; max-width: 400px; overflow: hidden; text-overflow: ellipsis;
   transition: all 0.3s ease; position: relative; z-index: 2;
 }
 .pt-card.lv-0 {
@@ -264,46 +300,36 @@ input[type="file"] { display: none; }
   font-size: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); color: #94a3b8;
 }
 
-/* 渐进展开：未揭示的节点隐藏 */
-.pt-node.unrevealed { display: none !important; }
+/* ===== 黑色幕布系统 ===== */
+.pt-card-wrapper.is-blackened::after {
+  content: ''; position: absolute; inset: 0; background: #000000;
+  border-radius: inherit; z-index: 8; transition: opacity 0.3s ease;
+  pointer-events: auto;
+}
 
-/* 有隐藏子节点的提示 */
-.pt-hidden-hint {
-  display: inline-block; font-size: 10px; color: #818cf8;
-  background: rgba(99,102,241,0.2); padding: 1px 6px; border-radius: 8px;
-  margin-left: 6px; font-weight: 500; cursor: default;
-  animation: hintPulse 2s ease-in-out infinite;
+.coverable { position: relative; }
+.cover-overlay {
+  position: absolute; inset: 0; background: #000000; border-radius: inherit;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 9; transition: all 0.3s ease;
+  opacity: 1; pointer-events: auto;
 }
-@keyframes hintPulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
+.cover-overlay.hidden { opacity: 0; pointer-events: none; }
 
 /* 焦点高亮 */
 .pt-card-wrapper.focused { z-index: 10; }
 .pt-card-wrapper.focused .pt-card {
-  animation: focusGlow 1.5s ease-in-out infinite;
-  z-index: 10;
+  animation: focusGlow 1.5s ease-in-out infinite; z-index: 10;
 }
 @keyframes focusGlow {
   0%, 100% { box-shadow: 0 0 16px rgba(99,102,241,0.5), 0 0 40px rgba(99,102,241,0.2); }
   50% { box-shadow: 0 0 28px rgba(99,102,241,0.8), 0 0 60px rgba(99,102,241,0.4); }
 }
-.pt-card-wrapper.focused .pt-card.lv-0 {
-  animation: focusGlowRoot 1.5s ease-in-out infinite;
-}
-@keyframes focusGlowRoot {
-  0%, 100% { box-shadow: 0 4px 28px rgba(99,102,241,0.4), 0 0 50px rgba(99,102,241,0.3); }
-  50% { box-shadow: 0 4px 40px rgba(99,102,241,0.8), 0 0 80px rgba(168,85,247,0.5); }
-}
 
-/* 节点备注 */
 .pt-note {
   font-size: 11px; color: #64748b; font-weight: 400; margin-top: 4px;
-  max-width: 280px; white-space: normal; line-height: 1.4;
+  max-width: 320px; white-space: normal; line-height: 1.4;
 }
-
-/* 子节点计数 */
 .pt-badge {
   display: inline-block; font-size: 10px; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7);
   padding: 1px 7px; border-radius: 10px; margin-left: 6px; font-weight: 500;
@@ -314,19 +340,16 @@ input[type="file"] { display: none; }
   display: flex; flex-direction: column; gap: 16px;
   margin-left: 50px; position: relative;
 }
-/* 父节点到子节点列的横线 */
 .pt-children::before {
   content: ''; position: absolute; left: -25px; top: 50%;
   width: 25px; height: 2px; transform: translateY(-50%);
   background: rgba(255,255,255,0.12); border-radius: 1px;
 }
-/* 每个子节点的横线 */
 .pt-children > .pt-node::before {
   content: ''; position: absolute; left: -25px; top: 50%;
   width: 25px; height: 2px; transform: translateY(-50%);
   background: rgba(255,255,255,0.12); border-radius: 1px;
 }
-/* 连接兄弟节点的竖线 */
 .pt-children > .pt-node::after {
   content: ''; position: absolute; left: -25px; top: 0; bottom: 0;
   width: 2px; background: rgba(255,255,255,0.12);
@@ -335,35 +358,14 @@ input[type="file"] { display: none; }
 .pt-children > .pt-node:last-child::after { bottom: 50%; }
 .pt-children > .pt-node:only-child::after { display: none; }
 
-/* ===== 遮盖系统 ===== */
-.coverable { position: relative; }
-.cover-overlay {
-  position: absolute; inset: 0; backdrop-filter: blur(14px);
-  background: rgba(15, 15, 35, 0.88); border-radius: inherit;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; z-index: 5; transition: all 0.3s ease;
-  opacity: 1; pointer-events: auto;
-}
-.cover-overlay.hidden { opacity: 0; pointer-events: none; }
-.cover-overlay:hover { background: rgba(15, 15, 35, 0.7); }
-.cover-icon { font-size: 22px; opacity: 0.5; transition: all 0.2s; user-select: none; }
-.cover-overlay:hover .cover-icon { opacity: 0.8; transform: scale(1.1); }
 .cover-mode-indicator {
-  position: fixed; top: 52px; left: 50%; transform: translateX(-50%);
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
   background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3);
   color: #fca5a5; padding: 6px 18px; border-radius: 20px;
   font-size: 12px; font-weight: 600; z-index: 100; pointer-events: none;
   display: none; animation: fadeInDown 0.3s ease;
 }
 .cover-mode-indicator.active { display: block; }
-@keyframes fadeInDown {
-  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 
 /* ===== 涂鸦 ===== */
 #drawCanvas {
@@ -423,14 +425,14 @@ input[type="file"] { display: none; }
 
 /* ===== 标签系统 ===== */
 .tag-input {
-  width: 110px; padding: 5px 10px; border-radius: 6px;
+  width: 100%; padding: 5px 8px; border-radius: 6px;
   border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05);
-  color: #e2e8f0; font-size: 12px; outline: none; transition: border 0.2s;
+  color: #e2e8f0; font-size: 11px; outline: none; transition: border 0.2s;
 }
-.tag-input:focus { border-color: #6366f1; width: 140px; }
+.tag-input:focus { border-color: #6366f1; }
 .tag-input::placeholder { color: #475569; }
 .tag-panel {
-  position: fixed; top: 52px; right: 12px; width: 280px; max-height: 420px;
+  position: fixed; top: 60px; left: 180px; width: 260px; max-height: 420px;
   overflow-y: auto; background: rgba(15, 15, 35, 0.97);
   border: 1px solid #1e1e3f; border-radius: 12px; padding: 14px;
   z-index: 80; display: none; backdrop-filter: blur(12px);
@@ -443,30 +445,21 @@ input[type="file"] { display: none; }
   padding: 7px 10px; border-radius: 6px; cursor: pointer; transition: background 0.2s; font-size: 13px;
 }
 .tag-panel-item:hover { background: rgba(255,255,255,0.06); }
-.tag-panel-tag { color: #a5b4fc; font-weight: 500; }
 .tag-panel-slide { color: #94a3b8; font-size: 12px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tag-panel-empty { color: #475569; font-size: 12px; text-align: center; padding: 24px 0; }
 
-/* 节点标签芯片 */
 .node-tags {
   display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; justify-content: center;
 }
 .tag-chip {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 9px; border-radius: 10px;
+  padding: 2px 8px; border-radius: 10px;
   background: rgba(99,102,241,0.18); color: #a5b4fc;
   font-size: 10px; font-weight: 500; cursor: pointer; transition: all 0.2s;
 }
 .tag-chip:hover { background: rgba(99,102,241,0.3); transform: translateY(-1px); }
-.tag-chip .tag-remove { font-size: 13px; opacity: 0.5; margin-left: 2px; cursor: pointer; line-height: 1; }
+.tag-chip .tag-remove { font-size: 12px; opacity: 0.5; margin-left: 2px; cursor: pointer; line-height: 1; }
 .tag-chip .tag-remove:hover { opacity: 1; color: #fca5a5; }
-
-/* 跳转高亮 */
-.pt-card.jump-highlight { animation: jumpPulse 0.7s ease 3; }
-@keyframes jumpPulse {
-  0%, 100% { box-shadow: 0 0 0 rgba(99,102,241,0); }
-  50% { box-shadow: 0 0 30px rgba(99,102,241,0.8), 0 0 60px rgba(99,102,241,0.3); }
-}
 
 /* ===== 底部控制栏 ===== */
 .pitch-controls {
@@ -482,7 +475,9 @@ input[type="file"] { display: none; }
 }
 .pitch-page { font-size: 12px; color: #475569; }
 .pitch-hint { font-size: 11px; color: #334155; }
-.pitch-nav { display: flex; gap: 10px; }
+
+/* 右下角导航按钮 */
+.pitch-nav { display: flex; gap: 6px; }
 .nav-btn {
   width: 36px; height: 36px; border-radius: 50%;
   border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04);
@@ -492,22 +487,13 @@ input[type="file"] { display: none; }
 .nav-btn:hover { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.3); color: white; }
 .nav-btn:disabled { opacity: 0.2; cursor: not-allowed; }
 
-/* ===== 响应式 ===== */
+/* KaTeX 渲染节点调整 */
+.katex-display { margin: 0.2em 0 !important; }
+
+/* ===== 响应式适配 ===== */
 @media (max-width: 768px) {
-  .pitch-top-controls { gap: 2px; padding: 6px 10px; }
-  .pitch-top-controls .btn { padding: 5px 10px; font-size: 11px; }
-  .speed-btn { padding: 2px 7px; font-size: 9px; }
-  .pt-card { padding: 8px 14px; max-width: 200px; }
-  .pt-card.lv-0 { font-size: 17px; padding: 12px 22px; }
-  .pt-card.lv-1 { font-size: 14px; }
-  .pt-card.lv-2 { font-size: 12px; }
-  .pitch-tree { padding: 30px 24px; }
-  .pt-children { margin-left: 36px; gap: 12px; }
-  .pt-children::before, .pt-children > .pt-node::before { left: -18px; width: 18px; }
-  .pt-children > .pt-node::after { left: -18px; }
-  .tag-panel { width: 240px; right: 4px; }
-  /* 移动端：面板缩窄或隐藏 */
-  .pitch-viewport { right: 0; }
+  .pitch-top-controls { width: 120px; left: 10px; top: 10px; padding: 8px; }
+  .pitch-viewport { left: 135px; right: 0; }
   .pitch-slide-panel {
     width: 100%; right: 0; top: auto; bottom: 64px; height: 45%;
     border-left: none; border-top: 1px solid #1e1e3f;
@@ -521,20 +507,20 @@ input[type="file"] { display: none; }
   <!-- ===== 上传页 ===== -->
   <div id="uploadPage">
     <div class="brand">
-      <h1>XMind Pitch Mode</h1>
-      <p>网页版 · 一键将思维导图变成演示文稿</p>
+      <h1>XMind & TXT Pitch Mode</h1>
+      <p>网页版 · 一键将思维导图/大纲文本转化为演示文稿</p>
     </div>
     <div class="upload-box" id="uploadBox">
       <div class="upload-icon">📂</div>
-      <div class="upload-title">点击或拖拽上传 .xmind 文件</div>
-      <div class="upload-desc">支持 XMind 8 / XMind 2020+ 格式</div>
+      <div class="upload-title">点击或拖拽上传 .xmind 或 .txt 文件</div>
+      <div class="upload-desc">支持 XMind 格式与带 LaTeX 公式的 TXT 文本</div>
       <div class="upload-hint">文件仅在本地浏览器处理，不上传服务器</div>
     </div>
-    <input type="file" id="fileInput" accept=".xmind">
+    <input type="file" id="fileInput" accept=".xmind,.txt">
     <div id="loadingArea">
       <div class="loading">
         <div class="spinner"></div>
-        <div style="color:#64748b;font-size:13px;">正在解析思维导图...</div>
+        <div style="color:#64748b;font-size:13px;">正在解析文件...</div>
       </div>
     </div>
     <div id="errorArea" class="error-box"></div>
@@ -548,7 +534,14 @@ input[type="file"] { display: none; }
         <span class="toolbar-title" id="previewTitle">未命名导图</span>
         <span class="toolbar-info" id="previewInfo"></span>
       </div>
-      <button class="btn btn-primary" onclick="startPitch()">▶ 开始演示</button>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="zoom-group">
+          <button class="zoom-btn" onclick="zoomOut()" title="缩小">−</button>
+          <span class="zoom-label" id="zoomLabelPreview" onclick="zoomReset()" title="点按恢复100%">100%</span>
+          <button class="zoom-btn" onclick="zoomIn()" title="放大">+</button>
+        </div>
+        <button class="btn btn-primary" onclick="startPitch()">▶ 开始演示</button>
+      </div>
     </div>
     <div class="preview-body" id="previewBody">
       <div class="mindmap-tree" id="mindmapTree"></div>
@@ -557,63 +550,73 @@ input[type="file"] { display: none; }
 
   <!-- ===== 演示页 ===== -->
   <div id="pitchPage">
-    <!-- 顶部控制栏 -->
     <div class="pitch-top-controls" id="pitchTopControls">
-      <button class="btn btn-secondary btn-sm" onclick="exitPitch()">← 退出</button>
+      <button class="btn btn-secondary btn-sm" onclick="exitPitch()">← 退出演示</button>
       <span class="control-divider"></span>
       <div class="control-group">
         <button class="btn btn-secondary btn-sm" id="btnAutoPlay" onclick="toggleAutoPlay()">
           <span class="auto-play-dot" id="autoPlayDot" style="display:none"></span>
           <span id="autoPlayLabel">▶ 播放</span>
         </button>
-        <button class="speed-btn active" data-speed="1" onclick="setAutoPlaySpeed(1,this)">1x</button>
-        <button class="speed-btn" data-speed="0.5" onclick="setAutoPlaySpeed(0.5,this)">0.5x</button>
-        <button class="speed-btn" data-speed="1.5" onclick="setAutoPlaySpeed(1.5,this)">1.5x</button>
-        <button class="speed-btn" data-speed="2" onclick="setAutoPlaySpeed(2,this)">2x</button>
-        <button class="speed-btn" data-speed="3" onclick="setAutoPlaySpeed(3,this)">3x</button>
+        <div class="speed-grid">
+          <button class="speed-btn active" data-speed="1" onclick="setAutoPlaySpeed(1,this)">1x</button>
+          <button class="speed-btn" data-speed="0.5" onclick="setAutoPlaySpeed(0.5,this)">0.5x</button>
+          <button class="speed-btn" data-speed="1.5" onclick="setAutoPlaySpeed(1.5,this)">1.5x</button>
+          <button class="speed-btn" data-speed="2" onclick="setAutoPlaySpeed(2,this)">2x</button>
+          <button class="speed-btn" data-speed="3" onclick="setAutoPlaySpeed(3,this)">3x</button>
+        </div>
       </div>
       <span class="control-divider"></span>
+      <button class="btn btn-primary btn-sm" id="btnUnblackAll" onclick="unblackAll()">💡 一键去黑</button>
+      <span class="control-divider"></span>
       <div class="control-group">
-        <button class="btn btn-secondary btn-sm" id="btnCoverMode" onclick="toggleCoverMode()">🔒 遮盖</button>
-        <button class="btn btn-secondary btn-sm" id="btnCoverAll" onclick="coverAll()" style="display:none">遮住子节点</button>
-        <button class="btn btn-secondary btn-sm" id="btnUncoverAll" onclick="uncoverAll()" style="display:none">揭开子节点</button>
+        <button class="btn btn-secondary btn-sm" id="btnCoverMode" onclick="toggleCoverMode()">遮盖模式</button>
+        <button class="btn btn-secondary btn-sm" id="btnCoverAll" onclick="coverAll()" style="display:none">全遮住</button>
+        <button class="btn btn-secondary btn-sm" id="btnUncoverAll" onclick="uncoverAll()" style="display:none">全揭开</button>
       </div>
       <span class="control-divider"></span>
       <button class="btn btn-secondary btn-sm" id="btnBrainstorm" onclick="toggleBrainstormMode()">🎨 涂鸦</button>
       <span class="control-divider"></span>
       <button class="btn btn-secondary btn-sm" id="btnQuiz" onclick="toggleQuizMode()">❓ 测验</button>
       <span class="control-divider"></span>
-      <div class="control-group">
+      <div class="search-group">
+        <input type="text" class="search-input" id="searchInput" placeholder="🔍 查找..." oninput="onSearchInput()" onkeydown="onSearchKeydown(event)">
+        <span class="search-count" id="searchCount" style="display:none"></span>
+      </div>
+      <span class="control-divider"></span>
+      <div class="zoom-group">
+        <button class="zoom-btn" onclick="zoomOut()" title="缩小">−</button>
+        <span class="zoom-label" id="zoomLabel" onclick="zoomReset()" title="点按恢复100%">100%</span>
+        <button class="zoom-btn" onclick="zoomIn()" title="放大">+</button>
+      </div>
+      <span class="control-divider"></span>
+      <div class="control-group" style="flex-direction:row; gap:4px;">
         <input type="text" class="tag-input" id="tagInput" placeholder="标签..." onkeydown="handleTagInput(event)">
-        <button class="btn btn-secondary btn-sm" onclick="openTagPanel()" title="标签列表">🏷</button>
+        <button class="btn btn-secondary btn-sm" onclick="openTagPanel()" title="标签列表" style="padding: 5px 8px;">🏷</button>
       </div>
     </div>
 
-    <!-- 遮盖模式提示 -->
-    <div class="cover-mode-indicator" id="coverModeIndicator">遮盖模式 · 点击节点卡片切换遮盖 · ESC 退出</div>
+    <div class="cover-mode-indicator" id="coverModeIndicator">遮盖模式 · 点击节点切换黑幕 · ESC 退出</div>
 
-    <!-- 思维导图树视口 -->
     <div class="pitch-viewport" id="pitchViewport">
       <div class="pitch-tree" id="pitchTree"></div>
     </div>
 
-    <!-- 独立演示面板（右侧，不受渐进展开影响）-->
     <div class="pitch-slide-panel" id="pitchSlidePanel">
+      <div class="panel-resize-handle" id="panelResizeHandle"></div>
       <div class="psp-breadcrumb" id="pspBreadcrumb"></div>
       <div class="psp-title" id="pspTitle"></div>
       <div class="psp-subtitle" id="pspSubtitle" style="display:none"></div>
       <div class="psp-children" id="pspChildren"></div>
       <div class="psp-note-area coverable" id="pspNoteArea" style="display:none">
         <div class="psp-note-text" id="pspNoteText"></div>
-        <div class="cover-overlay hidden"><span class="cover-icon">🔒</span></div>
+        <div class="cover-overlay hidden"></div>
       </div>
       <div class="psp-empty-hint" id="pspEmpty">子节点将在下方卡片中显示</div>
     </div>
 
-    <!-- 涂鸦画布 -->
     <canvas id="drawCanvas"></canvas>
 
-    <!-- 涂鸦工具栏 -->
     <div class="draw-toolbar" id="drawToolbar">
       <button class="draw-tool-btn active" id="drawToolPen" onclick="setDrawTool('pen')" title="画笔">✏️</button>
       <button class="draw-tool-btn" id="drawToolEraser" onclick="setDrawTool('eraser')" title="橡皮">🧹</button>
@@ -632,13 +635,11 @@ input[type="file"] { display: none; }
       <button class="draw-tool-btn" onclick="clearCanvas()" title="清除画布">🗑</button>
     </div>
 
-    <!-- 标签面板 -->
     <div class="tag-panel" id="tagPanel">
       <div class="tag-panel-title">🏷 标签列表</div>
       <div id="tagPanelContent"></div>
     </div>
 
-    <!-- 测验面板 -->
     <div class="quiz-panel" id="quizPanel">
       <div class="quiz-progress" id="quizProgress">已复习 <strong>0</strong> / <strong>0</strong> 题</div>
       <div class="quiz-hint-area" id="quizHintArea" onclick="revealQuizAnswer()">
@@ -650,14 +651,15 @@ input[type="file"] { display: none; }
       </div>
     </div>
 
-    <!-- 底部导航 -->
     <div class="pitch-controls">
       <div class="pitch-progress" id="pitchProgress"></div>
       <div class="pitch-page" id="pitchPageNum">1 / 1</div>
-      <div class="pitch-hint" id="pitchHint">← → 空格移动焦点 · ↑↓ 切换兄弟节点 · ESC 退出</div>
+      <div class="pitch-hint" id="pitchHint">空格/→ 切换下一个节点 · ↑↓ 切换同级 · ← 回父节点 · ESC 退出</div>
       <div class="pitch-nav">
-        <button class="nav-btn" id="btnPrev" onclick="if(isAutoPlaying)stopAutoPlay();prevSlide()">◀</button>
-        <button class="nav-btn" id="btnNext" onclick="if(isAutoPlaying)stopAutoPlay();nextSlide()">▶</button>
+        <button class="nav-btn" id="btnUp" onclick="if(isAutoPlaying)stopAutoPlay();focusPrevSibling()" title="上一个同级 (↑)">▲</button>
+        <button class="nav-btn" id="btnDown" onclick="if(isAutoPlaying)stopAutoPlay();focusNextSibling()" title="下一个同级 (↓)">▼</button>
+        <button class="nav-btn" id="btnPrev" onclick="if(isAutoPlaying)stopAutoPlay();prevSlide()" title="上一步 (←)">◀</button>
+        <button class="nav-btn" id="btnNext" onclick="if(isAutoPlaying)stopAutoPlay();nextSlide()" title="下一步 (→)">▶</button>
       </div>
     </div>
   </div>
@@ -668,25 +670,20 @@ input[type="file"] { display: none; }
 //  STATE
 // ======================================================================
 let currentData = null;
-let slides = [];               // DFS traversal order for navigation
-let currentFocus = 0;          // currently focused node index
+let slides = [];
+let currentFocus = 0;
 let totalNodes = 0;
 let fileName = '';
 let isInPitch = false;
 
-// Feature: Replay
+let visitedNodes = new Set();
+
 let isAutoPlaying = false;
 let autoPlaySpeed = 1;
 let autoPlayTimerId = null;
 const BASE_INTERVAL = 3000;
 
-// Feature: Cover
 let coverMode = false;
-
-// Progressive reveal
-let revealedNodes = new Set();
-
-// Feature: Brainstorm / Drawing
 let brainstormMode = false;
 let drawingState = { tool: 'pen', color: '#ff4444', size: 3 };
 let isDrawing = false;
@@ -694,18 +691,62 @@ let drawCanvas = null;
 let drawCtx = null;
 let lastPos = { x: 0, y: 0 };
 
-// Feature: Quiz
 let quizMode = false;
 let quizPool = [];
 let quizReviewed = new Set();
 let quizAnswerRevealed = false;
 
-// Feature: Tags
 let slideTags = {};
 let tagPanelOpen = false;
 
+// Feature: Search
+let searchMatches = [];
+let searchMatchIdx = -1;
+
+// Feature: Zoom
+let zoomLevel = 1.0;
+const ZOOM_MIN = 0.3;
+const ZOOM_MAX = 3.0;
+const ZOOM_STEP = 0.15;
+
 // ======================================================================
-//  FILE HANDLING
+//  LATEX & TEXT RENDERER
+// ======================================================================
+function renderContent(text) {
+  if (!text) return '';
+  text = text.trim();
+
+  // 含中文但非 LaTeX 公式块 → 纯文本，不做任何公式变换
+  if (/[一-鿿]/.test(text) && !/\\begin|\\end/.test(text)) {
+    return escapeHtml(text);
+  }
+
+  // 检查是否包含 LaTeX 关键字或数学公式标记
+  const hasLatex = /\\(frac|begin|cases|text|le|ge|times|sum|int|sqrt|alpha|beta|infty)|[\^_]\{|=\\frac|\$/.test(text);
+
+  if (hasLatex && typeof katex !== 'undefined') {
+    try {
+      let latexStr = text;
+      if (latexStr.startsWith('$') && latexStr.endsWith('$')) {
+        latexStr = latexStr.replace(/^\$+|\$+$/g, '');
+      }
+      // 修复：全角括号/逗号在 LaTeX 公式中会导致解析失败，转半角
+      // 但 \text{...} 内部的保留不动（KaTeX 支持 \text 内中文）
+      latexStr = latexStr.replace(/（/g, '(').replace(/）/g, ')');
+      return katex.renderToString(latexStr, {
+        throwOnError: false,
+        displayMode: text.includes('\\begin') || text.includes('\\frac')
+      });
+    } catch (e) {
+      console.warn("KaTeX Error: ", e);
+      return escapeHtml(text);
+    }
+  }
+  return escapeHtml(text);
+}
+
+// ======================================================================
+//  FILE HANDLING & PARSERS
 // ======================================================================
 const uploadBox = document.getElementById('uploadBox');
 const fileInput = document.getElementById('fileInput');
@@ -721,16 +762,23 @@ uploadBox.addEventListener('drop', (e) => {
 fileInput.addEventListener('change', (e) => { if (e.target.files.length > 0) handleFile(e.target.files[0]); });
 
 async function handleFile(file) {
-  if (!file.name.toLowerCase().endsWith('.xmind')) {
-    showError('请选择 .xmind 格式的文件');
+  const name = file.name.toLowerCase();
+  if (!name.endsWith('.xmind') && !name.endsWith('.txt')) {
+    showError('请选择 .xmind 或 .txt 格式的文件');
     return;
   }
-  fileName = file.name.replace(/\.xmind$/i, '');
+  fileName = file.name.replace(/\.(xmind|txt)$/i, '');
   document.getElementById('loadingArea').style.display = 'flex';
   document.getElementById('errorArea').style.display = 'none';
 
   try {
-    const data = await parseXMind(file);
+    let data;
+    if (name.endsWith('.txt')) {
+      const text = await file.text();
+      data = parseTXT(text);
+    } else {
+      data = await parseXMind(file);
+    }
     currentData = data;
     resetAllState();
     renderPreview(data);
@@ -750,6 +798,7 @@ function showError(msg) {
   el.style.display = 'block';
 }
 
+/* 解析 XMIND */
 async function parseXMind(file) {
   if (typeof JSZip === 'undefined') throw new Error('JSZip 库加载失败，请检查网络');
   const zip = await JSZip.loadAsync(file);
@@ -765,6 +814,121 @@ async function parseXMind(file) {
   return Array.isArray(parsed) ? parsed[0] : parsed;
 }
 
+/* 自动清理末尾斜杠，并识别公式自动补全 $ */
+function autoFormatNodeText(text) {
+  if (!text) return '';
+  let cleaned = text.replace(/\\+\s*$/, '').trim();
+
+  // 含中文 → 说明性文字，不自动包裹公式（避免把 S_w, S_R 等变量名错误包成 $...$）
+  if (/[一-鿿㐀-䶿]/.test(cleaned)) {
+    return cleaned;
+  }
+
+  if (cleaned.includes('$')) {
+    return cleaned;
+  }
+
+  const mathPattern = /([a-zA-Z0-9_\^\+\-\*\/\=\(\)\{\}\\]*[\_\^\\][a-zA-Z0-9_\^\+\-\*\/\=\(\)\{\}\\]*)/g;
+  return cleaned.replace(mathPattern, (match) => {
+    if (/[\_\^\\]/.test(match)) {
+      return `$${match}$`;
+    }
+    return match;
+  });
+}
+
+/* 解析 TXT / Markdown 树形文档 */
+function parseTXT(txtContent) {
+  const lines = txtContent.split(/\r?\n/);
+  const root = { title: fileName || '未命名文本', children: { attached: [] } };
+  
+  // 预处理合并多行 LaTeX (如 \begin{cases} ... \end{cases})
+  const processedLines = [];
+  let inFormula = false;
+  let formulaBuffer = [];
+
+  for (let line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.includes('\\begin{')) {
+      inFormula = true;
+      formulaBuffer.push(trimmed);
+      continue;
+    }
+    if (inFormula) {
+      formulaBuffer.push(trimmed);
+      if (trimmed.includes('\\end{')) {
+        inFormula = false;
+        processedLines.push(formulaBuffer.join(' '));
+        formulaBuffer = [];
+      }
+      continue;
+    }
+    if (line.length > 0) {
+      processedLines.push(line);
+    }
+  }
+
+  // 构建树算法 (依赖缩进和 Markdown 级数)
+  let stack = [{ level: -1, node: root }];
+  let isFirstNode = true;
+
+  for (let line of processedLines) {
+    if (!line.trim()) continue;
+
+    let raw = line;
+    let trimmed = raw.trim();
+    let level = 0;
+    let content = trimmed;
+
+    // 支持 Markdown # 标题判断
+    const headerMatch = trimmed.match(/^(#+)\s*(.*)/);
+    if (headerMatch) {
+      level = headerMatch[1].length - 1;
+      content = headerMatch[2];
+    } else {
+      // 通过空格/Tab缩进判断层级
+      const indentMatch = raw.match(/^(\s*)/);
+      const spaceCount = indentMatch ? indentMatch[1].replace(/\t/g, '  ').length : 0;
+      content = trimmed.replace(/^[-*+]\s*/, '').replace(/^###\s*/, '');
+      level = 1 + Math.floor(spaceCount / 2);
+
+      // 续行处理：无缩进、无标记、非#开头 → 与前一个节点同级（不是新根级）
+      if (spaceCount === 0 && !trimmed.match(/^(#|[-*+])/) && stack.length > 1 && !isFirstNode) {
+        level = stack[stack.length - 1].level;
+      }
+    }
+
+    if (!content.trim()) continue;
+    
+    // 自动清洗与公式转换
+    content = autoFormatNodeText(content.trim());
+
+    const newNode = { title: content, children: { attached: [] } };
+
+    if (isFirstNode) {
+      root.title = content;
+      stack[0].node = root;
+      stack[0].level = level;
+      isFirstNode = false;
+      continue;
+    }
+
+    // 寻找最近的父级
+    while (stack.length > 1 && stack[stack.length - 1].level >= level) {
+      stack.pop();
+    }
+
+    const parent = stack[stack.length - 1].node;
+    if (!parent.children) parent.children = { attached: [] };
+    if (!parent.children.attached) parent.children.attached = [];
+    parent.children.attached.push(newNode);
+
+    stack.push({ level: level, node: newNode });
+  }
+
+  return { rootTopic: root };
+}
+
 function resetAllState() {
   stopAutoPlay();
   exitCoverMode();
@@ -772,15 +936,16 @@ function resetAllState() {
   exitQuizMode();
   slideTags = {};
   tagPanelOpen = false;
-  revealedNodes = new Set();
+  visitedNodes = new Set();
   document.getElementById('tagPanel').classList.remove('open');
   document.getElementById('tagPanelContent').innerHTML = '';
   document.getElementById('tagInput').value = '';
   if (drawCtx && drawCanvas) { drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); }
+  zoomReset();
 }
 
 // ======================================================================
-//  PREVIEW TREE (unchanged)
+//  PREVIEW TREE
 // ======================================================================
 function buildTreeHTML(topic, depth = 0) {
   const title = (topic.title || '无标题').trim();
@@ -795,7 +960,7 @@ function buildTreeHTML(topic, depth = 0) {
   const cardCls = `level-${Math.min(depth, 3)}`;
 
   let html = `<div class="${cls}" data-level="${depth}">`;
-  html += `<div class="node-card ${cardCls}" title="${escapeAttr(title)}">${escapeHtml(title)}`;
+  html += `<div class="node-card ${cardCls}">${renderContent(title)}`;
   if (hasChildren) html += `<span class="child-count-badge">${children.length}</span>`;
   html += '</div>';
   if (hasChildren) {
@@ -810,7 +975,7 @@ function buildTreeHTML(topic, depth = 0) {
 function renderPreview(sheet) {
   const rootTopic = sheet.rootTopic;
   const rootTitle = (rootTopic.title || fileName || '未命名导图').trim();
-  document.getElementById('previewTitle').textContent = rootTitle;
+  document.getElementById('previewTitle').innerHTML = renderContent(rootTitle);
   let nodeCount = 0;
   function count(n) { nodeCount++; (n.children?.attached || []).forEach(count); }
   count(rootTopic);
@@ -837,17 +1002,15 @@ function buildPitchTreeHTML(topic, depth = 0) {
 
   let html = `<div class="pt-node" data-node-index="${idx}" data-depth="${depth}">`;
 
-  // Card wrapper (coverable)
   html += `<div class="pt-card-wrapper coverable" id="pt-node-${idx}" data-node="${idx}" data-depth="${depth}">`;
   html += `<div class="pt-card ${lvCls}">`;
-  html += escapeHtml(title);
+  html += renderContent(title);
   if (hasChildren) html += `<span class="pt-badge">${children.length}</span>`;
   html += '</div>';
-  if (note) html += `<div class="pt-note">${escapeHtml(note)}</div>`;
-  html += `<div class="cover-overlay hidden"><span class="cover-icon">🔒</span></div>`;
+  if (note) html += `<div class="pt-note">${renderContent(note)}</div>`;
+  html += `<div class="cover-overlay hidden"></div>`;
   html += '</div>';
 
-  // Children column
   if (hasChildren) {
     html += '<div class="pt-children">';
     children.forEach(child => { html += buildPitchTreeHTML(child, depth + 1); });
@@ -867,109 +1030,70 @@ function renderPitchTree(sheet) {
 }
 
 // ======================================================================
-//  PITCH TREE: Focus Navigation
+//  PITCH TREE: Focus & Visited Management
 // ======================================================================
 function focusPitchNode(index) {
   if (index < 0 || index >= totalNodes) return;
-  if (!revealedNodes.has(index)) return; // can't focus unrevealed nodes
 
-  // Remove old focus
+  visitedNodes.add(index);
+  updateBlacknessState();
+
   const prev = document.querySelector('.pt-card-wrapper.focused');
   if (prev) prev.classList.remove('focused');
 
-  // Add new focus
   const el = document.getElementById(`pt-node-${index}`);
   if (!el) return;
   el.classList.add('focused');
   currentFocus = index;
 
-  // Smooth scroll to node
-  el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+  el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
 
-  // Update UI
   document.getElementById('pitchPageNum').textContent = `${index + 1} / ${totalNodes}`;
   document.getElementById('pitchProgress').style.width = `${((index + 1) / totalNodes) * 100}%`;
   document.getElementById('btnPrev').disabled = index === 0;
   document.getElementById('btnNext').disabled = index === totalNodes - 1;
 
-  // Sync tags
   syncNodeTagsToDOM(index);
-  // Update independent pitch panel
   updatePitchPanel(index);
   updatePitchHint();
 }
 
-// Reveal all children of a node and update visibility
-function revealChildrenOfNode(nodeIndex) {
-  revealedNodes.add(nodeIndex);
-  const nodeEl = document.querySelector(`.pt-node[data-node-index="${nodeIndex}"]`);
-  if (!nodeEl) return;
-  const childrenContainer = nodeEl.querySelector(':scope > .pt-children');
-  if (!childrenContainer) return;
-  const childNodes = childrenContainer.querySelectorAll(':scope > .pt-node');
-  childNodes.forEach(child => {
-    const idx = parseInt(child.getAttribute('data-node-index'));
-    if (!isNaN(idx)) revealedNodes.add(idx);
-  });
-  updateNodeVisibility();
-}
-
-// Show/hide nodes based on revealed set
-function updateNodeVisibility() {
-  document.querySelectorAll('#pitchTree .pt-node').forEach(node => {
-    const idx = parseInt(node.getAttribute('data-node-index'));
-    if (isNaN(idx)) return;
-    if (revealedNodes.has(idx)) {
-      node.classList.remove('unrevealed');
-      // Remove hidden-hint if it exists
-      const hint = node.querySelector('.pt-hidden-hint');
-      if (hint) hint.remove();
-      // Add hint if this node has hidden children
-      const childrenContainer = node.querySelector(':scope > .pt-children');
-      if (childrenContainer && childrenContainer.children.length > 0) {
-        const anyHidden = [...childrenContainer.children].some(
-          c => c.classList.contains('pt-node') && c.classList.contains('unrevealed')
-        );
-        const card = node.querySelector(':scope > .pt-card-wrapper > .pt-card');
-        if (anyHidden && card) {
-          const existingHint = card.querySelector('.pt-hidden-hint');
-          if (!existingHint) {
-            const hiddenCount = [...childrenContainer.children].filter(
-              c => c.classList.contains('pt-node') && c.classList.contains('unrevealed')
-            ).length;
-            const hint = document.createElement('span');
-            hint.className = 'pt-hidden-hint';
-            hint.textContent = `+${hiddenCount}`;
-            card.appendChild(hint);
-          }
-        }
+function updateBlacknessState() {
+  document.querySelectorAll('#pitchTree .pt-card-wrapper').forEach(wrapper => {
+    const idx = parseInt(wrapper.getAttribute('data-node'));
+    if (!isNaN(idx)) {
+      if (visitedNodes.has(idx)) {
+        wrapper.classList.remove('is-blackened');
+      } else {
+        wrapper.classList.add('is-blackened');
       }
-    } else {
-      node.classList.add('unrevealed');
     }
   });
 }
 
-// Update the independent pitch panel on the right side
+function unblackAll() {
+  for (let i = 0; i < totalNodes; i++) {
+    visitedNodes.add(i);
+  }
+  updateBlacknessState();
+}
+
 function updatePitchPanel(index) {
   if (index < 0 || index >= slides.length) return;
   const slide = slides[index];
 
-  // Breadcrumb
   const breadEl = document.getElementById('pspBreadcrumb');
   if (slide.path.length > 0) {
-    breadEl.innerHTML = slide.path.map(p => escapeHtml(p)).join(' <span style="color:#475569">/</span> ');
+    breadEl.innerHTML = slide.path.map(p => renderContent(p)).join(' <span style="color:#475569">/</span> ');
     breadEl.style.display = '';
   } else {
     breadEl.style.display = 'none';
   }
 
-  // Title
   const titleEl = document.getElementById('pspTitle');
-  titleEl.textContent = slide.title;
+  titleEl.innerHTML = renderContent(slide.title);
   titleEl.className = slide.isRoot ? 'psp-title root-title' : 'psp-title';
 
-  // Subtitle (root only)
   const subEl = document.getElementById('pspSubtitle');
   if (slide.isRoot && slide.children.length > 0) {
     subEl.textContent = `${slide.children.length} 个分支主题`;
@@ -978,14 +1102,13 @@ function updatePitchPanel(index) {
     subEl.style.display = 'none';
   }
 
-  // Children cards
   const childrenEl = document.getElementById('pspChildren');
   if (slide.children.length > 0) {
     let cardsHtml = '';
     slide.children.forEach((child, j) => {
       cardsHtml += `<div class="psp-child-card coverable" id="psp-child-${j}" data-psp-child="${j}">
-        <div>${escapeHtml(child)}</div>
-        <div class="cover-overlay hidden"><span class="cover-icon">🔒</span></div>
+        <div>${renderContent(child)}</div>
+        <div class="cover-overlay hidden"></div>
       </div>`;
     });
     childrenEl.innerHTML = cardsHtml;
@@ -997,19 +1120,14 @@ function updatePitchPanel(index) {
     document.getElementById('pspEmpty').style.display = slide.isRoot ? '' : 'none';
   }
 
-  // Note
   const noteArea = document.getElementById('pspNoteArea');
   const noteText = document.getElementById('pspNoteText');
   if (slide.note) {
-    noteText.textContent = slide.note;
+    noteText.innerHTML = renderContent(slide.note);
     noteArea.style.display = '';
   } else {
     noteArea.style.display = 'none';
   }
-}
-
-function getFocusedEl() {
-  return document.getElementById(`pt-node-${currentFocus}`);
 }
 
 function getFocusedNodeEl() {
@@ -1018,101 +1136,29 @@ function getFocusedNodeEl() {
   return cardEl.closest('.pt-node');
 }
 
-function getNodeChildrenContainer(nodeEl) {
-  if (!nodeEl) return null;
-  return nodeEl.querySelector(':scope > .pt-children');
-}
+function nextSlide() { if (currentFocus + 1 < totalNodes) focusPitchNode(currentFocus + 1); }
+function prevSlide() { if (currentFocus - 1 >= 0) focusPitchNode(currentFocus - 1); }
 
-function nextSlide() {
-  const nodeEl = getFocusedNodeEl();
-  if (!nodeEl) return;
-
-  // 1) If current node has hidden children → reveal them and go to first child
-  const children = getNodeChildrenContainer(nodeEl);
-  if (children && children.children.length > 0) {
-    const anyHidden = [...children.children].some(
-      c => c.classList.contains('pt-node') && c.classList.contains('unrevealed')
-    );
-    if (anyHidden) {
-      revealChildrenOfNode(currentFocus);
-      const firstChild = children.querySelector(':scope > .pt-node');
-      if (firstChild) {
-        const idx = parseInt(firstChild.getAttribute('data-node-index'));
-        if (!isNaN(idx) && revealedNodes.has(idx)) { focusPitchNode(idx); return; }
-      }
-    }
-    // 2) Children already revealed → go to first child
-    const firstVisible = [...children.children].find(
-      c => c.classList.contains('pt-node') && !c.classList.contains('unrevealed')
-    );
-    if (firstVisible) {
-      const idx = parseInt(firstVisible.getAttribute('data-node-index'));
-      if (!isNaN(idx)) { focusPitchNode(idx); return; }
-    }
-  }
-
-  // 3) No children → go to next revealed sibling, or next revealed node in DFS
-  // Try next sibling first
-  const nextSib = findNextRevealedSibling(nodeEl);
-  if (nextSib !== null) { focusPitchNode(nextSib); return; }
-
-  // Go up to parent and try next sibling
-  let current = nodeEl;
-  while (current) {
-    const parentChildren = current.parentElement;
-    if (!parentChildren || !parentChildren.classList.contains('pt-children')) break;
-    const parentNode = parentChildren.parentElement;
-    if (!parentNode || !parentNode.classList.contains('pt-node')) break;
-    const parentNext = findNextRevealedSibling(parentNode);
-    if (parentNext !== null) { focusPitchNode(parentNext); return; }
-    current = parentNode;
-  }
-
-  // Fallback: next revealed in DFS order
-  for (let i = currentFocus + 1; i < totalNodes; i++) {
-    if (revealedNodes.has(i)) { focusPitchNode(i); return; }
-  }
-}
-
-function findNextRevealedSibling(nodeEl) {
-  let next = nodeEl.nextElementSibling;
-  while (next) {
-    if (next.classList.contains('pt-node') && !next.classList.contains('unrevealed')) {
-      return parseInt(next.getAttribute('data-node-index'));
-    }
-    next = next.nextElementSibling;
-  }
-  return null;
-}
-
-function prevSlide() {
-  // Go to previous revealed node in DFS
-  for (let i = currentFocus - 1; i >= 0; i--) {
-    if (revealedNodes.has(i)) { focusPitchNode(i); return; }
-  }
-}
-
-// Sibling navigation (up/down) — only among revealed siblings
 function focusNextSibling() {
   const nodeEl = getFocusedNodeEl();
   if (!nodeEl) return;
   const next = nodeEl.nextElementSibling;
-  if (next && next.classList.contains('pt-node') && !next.classList.contains('unrevealed')) {
+  if (next && next.classList.contains('pt-node')) {
     const idx = parseInt(next.getAttribute('data-node-index'));
-    if (!isNaN(idx)) { focusPitchNode(idx); }
+    if (!isNaN(idx)) focusPitchNode(idx);
   }
 }
+
 function focusPrevSibling() {
   const nodeEl = getFocusedNodeEl();
   if (!nodeEl) return;
   const prev = nodeEl.previousElementSibling;
-  if (prev && prev.classList.contains('pt-node') && !prev.classList.contains('unrevealed')) {
+  if (prev && prev.classList.contains('pt-node')) {
     const idx = parseInt(prev.getAttribute('data-node-index'));
-    if (!isNaN(idx)) { focusPitchNode(idx); }
+    if (!isNaN(idx)) focusPitchNode(idx);
   }
 }
 
-// Focus parent (left arrow)
 function focusParent() {
   const nodeEl = getFocusedNodeEl();
   if (!nodeEl) return;
@@ -1121,56 +1167,26 @@ function focusParent() {
   const parentNode = parentChildren.parentElement;
   if (!parentNode || !parentNode.classList.contains('pt-node')) return;
   const idx = parseInt(parentNode.getAttribute('data-node-index'));
-  if (!isNaN(idx)) { focusPitchNode(idx); }
-}
-
-// Focus first child (right arrow) — reveal first
-function focusFirstChild() {
-  const nodeEl = getFocusedNodeEl();
-  if (!nodeEl) return;
-  // Reveal children first if hidden
-  const children = getNodeChildrenContainer(nodeEl);
-  if (children && children.children.length > 0) {
-    const anyHidden = [...children.children].some(
-      c => c.classList.contains('pt-node') && c.classList.contains('unrevealed')
-    );
-    if (anyHidden) revealChildrenOfNode(currentFocus);
-  }
-  // Focus first visible child
-  if (children) {
-    const firstVisible = [...children.children].find(
-      c => c.classList.contains('pt-node') && !c.classList.contains('unrevealed')
-    );
-    if (firstVisible) {
-      const idx = parseInt(firstVisible.getAttribute('data-node-index'));
-      if (!isNaN(idx)) { focusPitchNode(idx); }
-    }
-  }
+  if (!isNaN(idx)) focusPitchNode(idx);
 }
 
 function updatePitchHint() {
   const hint = document.getElementById('pitchHint');
   if (quizMode) hint.textContent = '测验模式 · ESC 退出';
-  else if (coverMode) hint.textContent = '遮盖模式 · 点击节点切换遮盖 · ESC 退出';
+  else if (coverMode) hint.textContent = '遮盖模式 · 点击节点切换黑幕 · ESC 退出';
   else if (brainstormMode) hint.textContent = '涂鸦模式 · ESC 退出涂鸦';
   else if (isAutoPlaying) hint.textContent = '自动播放中 · 手动操作暂停';
-  else hint.textContent = '空格/→ 展开下一步 · ↑↓ 兄弟节点 · ← 回父节点 · 点击节点展开 · ESC 退出';
+  else hint.textContent = '空格/→ 下一步 · ↑↓ 切换同级 · ← 回父节点 · 点击节点聚焦去黑 · ESC 退出';
 }
 
-// ======================================================================
-//  HELPERS
-// ======================================================================
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
 }
-function escapeAttr(text) {
-  return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
 
 // ======================================================================
-//  SLIDES ARRAY (DFS navigation order only)
+//  SLIDES ARRAY
 // ======================================================================
 function generateSlides(sheet) {
   slides = [];
@@ -1197,23 +1213,22 @@ function generateSlides(sheet) {
 function startPitch() {
   isInPitch = true;
   renderPitchTree(currentData);
-  // Progressive reveal: start with only root visible
-  revealedNodes = new Set([0]);
-  updateNodeVisibility();
+  visitedNodes = new Set([0]);
+
   document.getElementById('pitchPage').style.display = 'block';
+  applyPanelWidth();
+  initPanelResize();
   focusPitchNode(0);
   initCanvasOnce();
   updatePitchPanel(0);
-  // Auto-play starts by default
+
   startAutoPlay();
-  // Re-sync all tags into the DOM tree
   for (const [idx] of Object.entries(slideTags)) {
     syncNodeTagsToDOM(parseInt(idx));
   }
 }
 
 function exitPitch() {
-  // ESC priority: quiz > cover > brainstorm > exit pitch
   if (quizMode) { exitQuiz(); return; }
   if (coverMode) { exitCoverMode(); return; }
   if (brainstormMode) { exitBrainstormMode(); return; }
@@ -1243,10 +1258,9 @@ function showUpload() {
 }
 
 // ======================================================================
-//  FEATURE: REPLAY / AUTO-PLAY
+//  AUTO-PLAY, COVER, BRAINSTORM, QUIZ & TAGS
 // ======================================================================
 function toggleAutoPlay() { isAutoPlaying ? stopAutoPlay() : startAutoPlay(); }
-
 function startAutoPlay() {
   isAutoPlaying = true;
   document.getElementById('autoPlayDot').style.display = 'inline-block';
@@ -1254,7 +1268,6 @@ function startAutoPlay() {
   updatePitchHint();
   scheduleNextSlide();
 }
-
 function stopAutoPlay() {
   isAutoPlaying = false;
   clearTimeout(autoPlayTimerId);
@@ -1263,27 +1276,19 @@ function stopAutoPlay() {
   document.getElementById('autoPlayLabel').textContent = '▶ 播放';
   updatePitchHint();
 }
-
 function scheduleNextSlide() {
   if (!isAutoPlaying) return;
   const interval = BASE_INTERVAL / autoPlaySpeed;
   autoPlayTimerId = setTimeout(() => {
     const prevFocus = currentFocus;
-    // Try: expand into children (if hidden) and advance
     nextSlide();
-    if (currentFocus === prevFocus) {
-      // No advance possible — are we at the true end?
-      // Check if there are ANY hidden children left in the entire tree
-      const anyHidden = document.querySelector('#pitchTree .pt-node.unrevealed');
-      if (!anyHidden && currentFocus >= totalNodes - 1) {
-        stopAutoPlay(); // Truly done: all nodes revealed and visited
-        return;
-      }
+    if (currentFocus === prevFocus && currentFocus >= totalNodes - 1) {
+      stopAutoPlay();
+      return;
     }
     scheduleNextSlide();
   }, interval);
 }
-
 function setAutoPlaySpeed(speed, btnEl) {
   autoPlaySpeed = speed;
   document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
@@ -1291,14 +1296,10 @@ function setAutoPlaySpeed(speed, btnEl) {
   if (isAutoPlaying) { clearTimeout(autoPlayTimerId); scheduleNextSlide(); }
 }
 
-// ======================================================================
-//  FEATURE: COVER / UNCOVER
-// ======================================================================
 function toggleCoverMode() { coverMode ? exitCoverMode() : enterCoverMode(); }
-
 function enterCoverMode() {
   coverMode = true;
-  document.getElementById('btnCoverMode').textContent = '🔓 退出遮盖';
+  document.getElementById('btnCoverMode').textContent = '退出遮盖';
   document.getElementById('btnCoverMode').classList.add('btn-danger');
   document.getElementById('btnCoverMode').classList.remove('btn-secondary');
   document.getElementById('btnCoverAll').style.display = '';
@@ -1306,10 +1307,9 @@ function enterCoverMode() {
   document.getElementById('coverModeIndicator').classList.add('active');
   updatePitchHint();
 }
-
 function exitCoverMode() {
   coverMode = false;
-  document.getElementById('btnCoverMode').textContent = '🔒 遮盖';
+  document.getElementById('btnCoverMode').textContent = '遮盖模式';
   document.getElementById('btnCoverMode').classList.remove('btn-danger');
   document.getElementById('btnCoverMode').classList.add('btn-secondary');
   document.getElementById('btnCoverAll').style.display = 'none';
@@ -1317,8 +1317,6 @@ function exitCoverMode() {
   document.getElementById('coverModeIndicator').classList.remove('active');
   updatePitchHint();
 }
-
-// Cover all children in the independent pitch panel
 function coverAll() {
   const cards = document.querySelectorAll('#pspChildren .psp-child-card.coverable');
   cards.forEach(el => {
@@ -1326,7 +1324,6 @@ function coverAll() {
     const overlay = el.querySelector('.cover-overlay');
     if (overlay) overlay.classList.remove('hidden');
   });
-  // Also cover note
   const noteArea = document.getElementById('pspNoteArea');
   if (noteArea && noteArea.style.display !== 'none') {
     noteArea.classList.add('covered');
@@ -1334,8 +1331,6 @@ function coverAll() {
     if (noteOverlay) noteOverlay.classList.remove('hidden');
   }
 }
-
-// Uncover all children in the independent pitch panel
 function uncoverAll() {
   const cards = document.querySelectorAll('#pspChildren .psp-child-card.coverable');
   cards.forEach(el => {
@@ -1350,7 +1345,6 @@ function uncoverAll() {
     if (noteOverlay) noteOverlay.classList.add('hidden');
   }
 }
-
 function toggleElementCover(el) {
   const overlay = el.querySelector('.cover-overlay');
   if (!overlay) return;
@@ -1359,11 +1353,7 @@ function toggleElementCover(el) {
   else { overlay.classList.add('hidden'); el.classList.remove('covered'); }
 }
 
-// ======================================================================
-//  FEATURE: BRAINSTORM / DRAWING (unchanged core logic)
-// ======================================================================
 function toggleBrainstormMode() { brainstormMode ? exitBrainstormMode() : enterBrainstormMode(); }
-
 function enterBrainstormMode() {
   brainstormMode = true;
   document.getElementById('drawCanvas').classList.add('active');
@@ -1374,7 +1364,6 @@ function enterBrainstormMode() {
   resizeCanvas();
   updatePitchHint();
 }
-
 function exitBrainstormMode() {
   brainstormMode = false;
   isDrawing = false;
@@ -1386,7 +1375,6 @@ function exitBrainstormMode() {
   document.getElementById('btnBrainstorm').classList.add('btn-secondary');
   updatePitchHint();
 }
-
 function initCanvasOnce() {
   if (drawCanvas) return;
   drawCanvas = document.getElementById('drawCanvas');
@@ -1404,7 +1392,6 @@ function initCanvasOnce() {
   drawCanvas.addEventListener('touchcancel', stopDrawing);
   window.addEventListener('resize', resizeCanvas);
 }
-
 function resizeCanvas() {
   if (!drawCanvas) return;
   const tmp = document.createElement('canvas');
@@ -1416,14 +1403,12 @@ function resizeCanvas() {
   if (drawCtx && tmp.width > 0) drawCtx.drawImage(tmp, 0, 0);
   if (drawCtx) { drawCtx.lineCap = 'round'; drawCtx.lineJoin = 'round'; }
 }
-
 function getPos(e) {
   const rect = drawCanvas.getBoundingClientRect();
   if (e.touches && e.touches.length > 0)
     return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
   return { x: e.clientX - rect.left, y: e.clientY - rect.top };
 }
-
 function startDrawing(e) {
   if (!brainstormMode) return;
   e.preventDefault();
@@ -1436,7 +1421,6 @@ function startDrawing(e) {
   drawCtx.arc(pos.x, pos.y, drawingState.size / 2, 0, Math.PI * 2);
   drawCtx.fill();
 }
-
 function draw(e) {
   if (!isDrawing || !brainstormMode) return;
   e.preventDefault();
@@ -1450,7 +1434,6 @@ function draw(e) {
   drawCtx.stroke();
   lastPos = pos;
 }
-
 function stopDrawing() { isDrawing = false; }
 function setDrawTool(tool) {
   drawingState.tool = tool;
@@ -1472,22 +1455,15 @@ function clearCanvas() {
   drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
 }
 
-// ======================================================================
-//  FEATURE: QUIZ MODE
-// ======================================================================
 function toggleQuizMode() { quizMode ? exitQuiz() : startQuiz(); }
-
 function startQuiz() {
   quizPool = []; quizReviewed = new Set(); quizAnswerRevealed = false;
-  // Only include non-leaf nodes (nodes with children to cover/reveal)
   for (let i = 1; i < totalNodes; i++) {
     if (slides[i].children.length > 0) quizPool.push(i);
   }
   if (quizPool.length === 0) { alert('需要至少一个非根节点才能使用测验模式'); quizMode = false; return; }
   quizMode = true;
-  // Bypass progressive reveal: reveal all nodes for quiz
-  for (let i = 0; i < totalNodes; i++) revealedNodes.add(i);
-  updateNodeVisibility();
+  unblackAll();
   document.getElementById('quizPanel').classList.add('active');
   document.getElementById('btnQuiz').textContent = '❌ 退出测验';
   document.getElementById('btnQuiz').classList.add('btn-danger');
@@ -1495,7 +1471,6 @@ function startQuiz() {
   updateQuizProgress();
   nextQuizSlide();
 }
-
 function nextQuizSlide() {
   quizAnswerRevealed = false;
   const remaining = quizPool.filter(i => !quizReviewed.has(i));
@@ -1508,18 +1483,15 @@ function nextQuizSlide() {
   updateQuizProgress();
   updatePitchHint();
 }
-
 function revealQuizAnswer() {
   if (!quizMode) return;
   quizAnswerRevealed = true;
   uncoverAll();
 }
-
 function updateQuizProgress() {
   document.getElementById('quizProgress').innerHTML =
     `已复习 <strong>${quizReviewed.size}</strong> / <strong>${quizPool.length}</strong> 题`;
 }
-
 function exitQuiz() {
   quizMode = false; quizAnswerRevealed = false;
   uncoverAll();
@@ -1529,7 +1501,6 @@ function exitQuiz() {
   document.getElementById('btnQuiz').classList.add('btn-secondary');
   updatePitchHint();
 }
-
 function exitQuizMode() {
   if (quizMode) {
     quizMode = false; quizAnswerRevealed = false; uncoverAll();
@@ -1540,9 +1511,6 @@ function exitQuizMode() {
   }
 }
 
-// ======================================================================
-//  FEATURE: TAGS
-// ======================================================================
 function handleTagInput(event) {
   if (event.key === 'Enter') {
     event.preventDefault();
@@ -1552,7 +1520,6 @@ function handleTagInput(event) {
   }
   if (event.key.startsWith('Arrow') || event.key === ' ') event.stopPropagation();
 }
-
 function addTag(nodeIndex, tag) {
   if (!slideTags[nodeIndex]) slideTags[nodeIndex] = [];
   if (slideTags[nodeIndex].includes(tag)) return;
@@ -1560,7 +1527,6 @@ function addTag(nodeIndex, tag) {
   syncNodeTagsToDOM(nodeIndex);
   if (tagPanelOpen) renderTagPanel();
 }
-
 function removeTag(nodeIndex, tag) {
   if (!slideTags[nodeIndex]) return;
   slideTags[nodeIndex] = slideTags[nodeIndex].filter(t => t !== tag);
@@ -1568,18 +1534,13 @@ function removeTag(nodeIndex, tag) {
   syncNodeTagsToDOM(nodeIndex);
   if (tagPanelOpen) renderTagPanel();
 }
-
 function syncNodeTagsToDOM(nodeIndex) {
   const cardWrapper = document.getElementById(`pt-node-${nodeIndex}`);
   if (!cardWrapper) return;
-
-  // Remove existing tags
   const existing = cardWrapper.querySelector('.node-tags');
   if (existing) existing.remove();
-
   const tags = slideTags[nodeIndex];
   if (!tags || tags.length === 0) return;
-
   const tagsDiv = document.createElement('div');
   tagsDiv.className = 'node-tags';
   tags.forEach(tag => {
@@ -1598,28 +1559,17 @@ function syncNodeTagsToDOM(nodeIndex) {
   });
   cardWrapper.appendChild(tagsDiv);
 }
-
-function jumpToNodeByTag(nodeIndex) {
-  focusPitchNode(nodeIndex);
-  const cardWrapper = document.getElementById(`pt-node-${nodeIndex}`);
-  if (cardWrapper) {
-    const card = cardWrapper.querySelector('.pt-card');
-    if (card) { card.classList.add('jump-highlight'); setTimeout(() => card.classList.remove('jump-highlight'), 2100); }
-  }
-}
-
+function jumpToNodeByTag(nodeIndex) { focusPitchNode(nodeIndex); }
 function openTagPanel() {
   tagPanelOpen = !tagPanelOpen;
   const panel = document.getElementById('tagPanel');
   if (tagPanelOpen) { panel.classList.add('open'); renderTagPanel(); }
   else panel.classList.remove('open');
 }
-
 function closeTagPanel() {
   tagPanelOpen = false;
   document.getElementById('tagPanel').classList.remove('open');
 }
-
 function renderTagPanel() {
   const content = document.getElementById('tagPanelContent');
   const entries = [];
@@ -1630,7 +1580,7 @@ function renderTagPanel() {
     tags.forEach(tag => entries.push({ tag, nodeIndex: parseInt(nodeIdx), title: slide.title }));
   }
   if (entries.length === 0) {
-    content.innerHTML = '<div class="tag-panel-empty">暂无标签<br><span style="font-size:11px">在上方输入标签名后按回车添加</span></div>';
+    content.innerHTML = '<div class="tag-panel-empty">暂无标签<br><span style="font-size:11px">在输入框输入后回车添加</span></div>';
     return;
   }
   const grouped = {};
@@ -1640,7 +1590,7 @@ function renderTagPanel() {
     html += `<div style="margin-bottom:10px;"><div style="color:#a5b4fc;font-weight:600;font-size:12px;margin-bottom:4px;">🏷 ${escapeHtml(tag)} (${items.length})</div>`;
     items.forEach(item => {
       html += `<div class="tag-panel-item" onclick="jumpToNodeByTag(${item.nodeIndex});closeTagPanel();">
-        <span class="tag-panel-slide" title="${escapeAttr(item.title)}">${escapeHtml(item.title)}</span>
+        <span class="tag-panel-slide">${renderContent(item.title)}</span>
         <span style="color:#475569;font-size:10px;flex-shrink:0;margin-left:8px;">#${item.nodeIndex + 1}</span>
       </div>`;
     });
@@ -1650,90 +1600,196 @@ function renderTagPanel() {
 }
 
 // ======================================================================
-//  KEYBOARD HANDLER
+//  FEATURE: 查找定位
+// ======================================================================
+function onSearchInput() {
+  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+  const countEl = document.getElementById('searchCount');
+  // Clear previous highlights
+  document.querySelectorAll('.search-highlight').forEach(el => el.classList.remove('search-highlight'));
+
+  if (!query) {
+    searchMatches = [];
+    searchMatchIdx = -1;
+    countEl.style.display = 'none';
+    return;
+  }
+
+  // Find all matching node indices (search title)
+  searchMatches = [];
+  for (let i = 0; i < slides.length; i++) {
+    if (slides[i].title.toLowerCase().includes(query)) {
+      searchMatches.push(i);
+    }
+  }
+  searchMatchIdx = searchMatches.length > 0 ? 0 : -1;
+
+  if (searchMatches.length > 0) {
+    countEl.textContent = `${searchMatchIdx + 1}/${searchMatches.length}`;
+    countEl.style.display = '';
+    // Highlight all matches in tree
+    searchMatches.forEach(idx => {
+      const el = document.getElementById(`pt-node-${idx}`);
+      if (el) el.classList.add('search-highlight');
+    });
+    // Jump to first match
+    focusPitchNode(searchMatches[0]);
+  } else {
+    countEl.textContent = '0';
+    countEl.style.display = '';
+  }
+}
+
+function onSearchKeydown(event) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    if (searchMatches.length === 0) return;
+    // Cycle to next match
+    searchMatchIdx = (searchMatchIdx + 1) % searchMatches.length;
+    focusPitchNode(searchMatches[searchMatchIdx]);
+    document.getElementById('searchCount').textContent = `${searchMatchIdx + 1}/${searchMatches.length}`;
+    // Re-highlight
+    document.querySelectorAll('.search-highlight').forEach(el => el.classList.remove('search-highlight'));
+    searchMatches.forEach(idx => {
+      const el = document.getElementById(`pt-node-${idx}`);
+      if (el) el.classList.add('search-highlight');
+    });
+  } else if (event.key === 'Escape') {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchInput').blur();
+    onSearchInput(); // clear
+    event.stopPropagation(); // don't also exit pitch
+  }
+  // Don't let arrow keys in search bubble to navigation
+  if (event.key.startsWith('Arrow') || event.key === ' ') {
+    event.stopPropagation();
+  }
+}
+
+// ======================================================================
+//  FEATURE: 面板拖拽调节宽度
+// ======================================================================
+let panelWidth = 440;
+const PANEL_MIN = 240;
+const PANEL_MAX = 800;
+
+function initPanelResize() {
+  const handle = document.getElementById('panelResizeHandle');
+  if (!handle) return;
+  let startX, startWidth;
+
+  function onDown(e) {
+    e.preventDefault();
+    startX = e.touches ? e.touches[0].clientX : e.clientX;
+    startWidth = panelWidth;
+    handle.classList.add('active');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onUp);
+  }
+
+  function onMove(e) {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const delta = startX - clientX;
+    panelWidth = Math.min(PANEL_MAX, Math.max(PANEL_MIN, startWidth + delta));
+    applyPanelWidth();
+  }
+
+  function onUp() {
+    handle.classList.remove('active');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onUp);
+  }
+
+  handle.addEventListener('mousedown', onDown);
+  handle.addEventListener('touchstart', onDown, { passive: false });
+}
+
+function applyPanelWidth() {
+  const panel = document.getElementById('pitchSlidePanel');
+  const viewport = document.getElementById('pitchViewport');
+  if (panel) panel.style.width = panelWidth + 'px';
+  if (viewport) viewport.style.right = panelWidth + 'px';
+}
+
+// ======================================================================
+//  FEATURE: 缩放
+// ======================================================================
+function applyZoom() {
+  const trees = [document.getElementById('mindmapTree'), document.getElementById('pitchTree')];
+  trees.forEach(tree => {
+    if (!tree) return;
+    tree.style.transform = `scale(${zoomLevel})`;
+    tree.style.transformOrigin = 'top left';
+  });
+  const labels = [document.getElementById('zoomLabel'), document.getElementById('zoomLabelPreview')];
+  labels.forEach(l => { if (l) l.textContent = `${Math.round(zoomLevel * 100)}%`; });
+}
+
+function zoomIn() {
+  zoomLevel = Math.min(ZOOM_MAX, zoomLevel + ZOOM_STEP);
+  applyZoom();
+}
+
+function zoomOut() {
+  zoomLevel = Math.max(ZOOM_MIN, zoomLevel - ZOOM_STEP);
+  applyZoom();
+}
+
+function zoomReset() {
+  zoomLevel = 1.0;
+  applyZoom();
+}
+
+// ======================================================================
+//  KEYBOARD & CLICK HANDLERS
 // ======================================================================
 document.addEventListener('keydown', (e) => {
   if (!isInPitch) return;
 
-  // Tag input active: block navigation keys
   if (document.activeElement === document.getElementById('tagInput')) {
     if (e.key === 'Escape') { document.getElementById('tagInput').blur(); e.preventDefault(); }
     return;
   }
-
-  // ESC priority
+  // Search input active: handled by onSearchKeydown
+  if (document.activeElement === document.getElementById('searchInput')) return;
   if (e.key === 'Escape') { e.preventDefault(); exitPitch(); return; }
+  if (quizMode || coverMode) return;
 
-  // Quiz mode: no navigation
-  if (quizMode) return;
-
-  // Cover mode: no slide navigation
-  if (coverMode) return;
-
-  // Tree navigation (manual → stop auto-play)
-  if (e.key === 'ArrowRight') {
-    e.preventDefault();
-    if (isAutoPlaying) stopAutoPlay();
-    focusFirstChild();
-  } else if (e.key === ' ' || e.key === 'PageDown') {
-    e.preventDefault();
-    if (isAutoPlaying) stopAutoPlay();
-    nextSlide();
+  if (e.key === 'ArrowRight' || e.key === ' ') {
+    e.preventDefault(); if (isAutoPlaying) stopAutoPlay(); nextSlide();
   } else if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    if (isAutoPlaying) stopAutoPlay();
-    focusNextSibling();
+    e.preventDefault(); if (isAutoPlaying) stopAutoPlay(); focusNextSibling();
   } else if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    if (isAutoPlaying) stopAutoPlay();
-    focusPrevSibling();
-  } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-    e.preventDefault();
-    if (isAutoPlaying) stopAutoPlay();
-    focusParent();
+    e.preventDefault(); if (isAutoPlaying) stopAutoPlay(); focusPrevSibling();
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault(); if (isAutoPlaying) stopAutoPlay(); focusParent();
   }
 });
 
-// ======================================================================
-//  CLICK HANDLER (tree interaction)
-// ======================================================================
 document.getElementById('pitchTree').addEventListener('click', (e) => {
   if (!isInPitch) return;
   if (e.target.closest('.pitch-controls') || e.target.closest('.pitch-top-controls')) return;
 
-  // Quiz mode: clicking covered nodes reveals them
   if (quizMode) {
     const coverableEl = e.target.closest('.coverable');
     if (coverableEl) {
       const overlay = coverableEl.querySelector('.cover-overlay');
-      if (overlay && !overlay.classList.contains('hidden')) {
-        toggleElementCover(coverableEl);
-        // Check if all covered children are revealed
-        const nodeEl = getFocusedNodeEl();
-        if (nodeEl) {
-          const children = getNodeChildrenContainer(nodeEl);
-          if (children) {
-            const allOverlays = children.querySelectorAll(':scope > .pt-node > .pt-card-wrapper .cover-overlay');
-            const allHidden = [...allOverlays].every(o => o.classList.contains('hidden'));
-            if (allHidden) quizAnswerRevealed = true;
-          }
-        }
-      }
+      if (overlay && !overlay.classList.contains('hidden')) toggleElementCover(coverableEl);
     }
     return;
   }
 
-  // Cover mode: toggle cover on clicked node
   if (coverMode) {
     const coverableEl = e.target.closest('.coverable');
-    if (coverableEl) { toggleElementCover(coverableEl); }
+    if (coverableEl) toggleElementCover(coverableEl);
     return;
   }
 
-  // Normal mode: click on a node card to focus it
-  if (e.target.closest('.tag-chip') || e.target.closest('.tag-remove') ||
-      e.target.closest('.tag-panel') || e.target.closest('.cover-overlay')) return;
-
+  if (e.target.closest('.tag-chip') || e.target.closest('.tag-remove') || e.target.closest('.tag-panel')) return;
   if (brainstormMode && e.target.closest('#drawCanvas')) return;
 
   const cardWrapper = e.target.closest('.pt-card-wrapper');
@@ -1741,62 +1797,27 @@ document.getElementById('pitchTree').addEventListener('click', (e) => {
     const nodeEl = cardWrapper.closest('.pt-node');
     if (nodeEl) {
       const idx = parseInt(nodeEl.getAttribute('data-node-index'));
-      if (!isNaN(idx) && revealedNodes.has(idx)) {
+      if (!isNaN(idx)) {
         if (isAutoPlaying) stopAutoPlay();
-        // Click: reveal children of this node (if hidden), then focus
-        const children = getNodeChildrenContainer(nodeEl);
-        if (children && children.children.length > 0) {
-          const anyHidden = [...children.children].some(
-            c => c.classList.contains('pt-node') && c.classList.contains('unrevealed')
-          );
-          if (anyHidden) revealChildrenOfNode(idx);
-        }
         focusPitchNode(idx);
       }
     }
     return;
   }
-
-  // Click on empty space → next node
   nextSlide();
 });
 
-// ======================================================================
-//  PITCH PANEL CLICK HANDLER (cover + quiz in independent panel)
-// ======================================================================
 document.getElementById('pitchSlidePanel').addEventListener('click', (e) => {
   if (!isInPitch) return;
-
-  // Quiz mode: clicking covered elements in the panel reveals them
-  if (quizMode) {
+  if (quizMode || coverMode) {
     const coverableEl = e.target.closest('.coverable');
-    if (coverableEl) {
-      const overlay = coverableEl.querySelector('.cover-overlay');
-      if (overlay && !overlay.classList.contains('hidden')) {
-        toggleElementCover(coverableEl);
-        // Check if all covered are now revealed
-        const allOverlays = document.querySelectorAll('#pspChildren .cover-overlay, #pspNoteArea .cover-overlay');
-        const allHidden = [...allOverlays].every(o => o.classList.contains('hidden'));
-        if (allHidden) quizAnswerRevealed = true;
-      }
-    }
-    return;
-  }
-
-  // Cover mode: toggle cover on clicked panel cards
-  if (coverMode) {
-    const coverableEl = e.target.closest('.coverable');
-    if (coverableEl) { toggleElementCover(coverableEl); }
-    return;
+    if (coverableEl) toggleElementCover(coverableEl);
   }
 });
 
-// Close tag panel on outside click
 document.addEventListener('click', (e) => {
   if (!tagPanelOpen) return;
-  if (!e.target.closest('.tag-panel') && !e.target.closest('#tagGroup')) {
-    closeTagPanel();
-  }
+  if (!e.target.closest('.tag-panel') && !e.target.closest('#tagInput')) closeTagPanel();
 });
 </script>
 
