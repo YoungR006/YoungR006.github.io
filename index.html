@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>XMind Pitch Mode - 网页版</title>
+<title>Young Rich</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ===== 全局基础 ===== */
@@ -656,8 +656,8 @@ input[type="file"] { display: none; }
       <div class="pitch-page" id="pitchPageNum">1 / 1</div>
       <div class="pitch-hint" id="pitchHint">← → 空格移动焦点 · ↑↓ 切换兄弟节点 · ESC 退出</div>
       <div class="pitch-nav">
-        <button class="nav-btn" id="btnPrev" onclick="prevSlide()">◀</button>
-        <button class="nav-btn" id="btnNext" onclick="nextSlide()">▶</button>
+        <button class="nav-btn" id="btnPrev" onclick="if(isAutoPlaying)stopAutoPlay();prevSlide()">◀</button>
+        <button class="nav-btn" id="btnNext" onclick="if(isAutoPlaying)stopAutoPlay();nextSlide()">▶</button>
       </div>
     </div>
   </div>
@@ -1024,7 +1024,6 @@ function getNodeChildrenContainer(nodeEl) {
 }
 
 function nextSlide() {
-  if (isAutoPlaying) stopAutoPlay();
   const nodeEl = getFocusedNodeEl();
   if (!nodeEl) return;
 
@@ -1087,7 +1086,6 @@ function findNextRevealedSibling(nodeEl) {
 }
 
 function prevSlide() {
-  if (isAutoPlaying) stopAutoPlay();
   // Go to previous revealed node in DFS
   for (let i = currentFocus - 1; i >= 0; i--) {
     if (revealedNodes.has(i)) { focusPitchNode(i); return; }
@@ -1101,7 +1099,7 @@ function focusNextSibling() {
   const next = nodeEl.nextElementSibling;
   if (next && next.classList.contains('pt-node') && !next.classList.contains('unrevealed')) {
     const idx = parseInt(next.getAttribute('data-node-index'));
-    if (!isNaN(idx)) { if (isAutoPlaying) stopAutoPlay(); focusPitchNode(idx); }
+    if (!isNaN(idx)) { focusPitchNode(idx); }
   }
 }
 function focusPrevSibling() {
@@ -1110,7 +1108,7 @@ function focusPrevSibling() {
   const prev = nodeEl.previousElementSibling;
   if (prev && prev.classList.contains('pt-node') && !prev.classList.contains('unrevealed')) {
     const idx = parseInt(prev.getAttribute('data-node-index'));
-    if (!isNaN(idx)) { if (isAutoPlaying) stopAutoPlay(); focusPitchNode(idx); }
+    if (!isNaN(idx)) { focusPitchNode(idx); }
   }
 }
 
@@ -1123,7 +1121,7 @@ function focusParent() {
   const parentNode = parentChildren.parentElement;
   if (!parentNode || !parentNode.classList.contains('pt-node')) return;
   const idx = parseInt(parentNode.getAttribute('data-node-index'));
-  if (!isNaN(idx)) { if (isAutoPlaying) stopAutoPlay(); focusPitchNode(idx); }
+  if (!isNaN(idx)) { focusPitchNode(idx); }
 }
 
 // Focus first child (right arrow) — reveal first
@@ -1145,7 +1143,7 @@ function focusFirstChild() {
     );
     if (firstVisible) {
       const idx = parseInt(firstVisible.getAttribute('data-node-index'));
-      if (!isNaN(idx)) { if (isAutoPlaying) stopAutoPlay(); focusPitchNode(idx); }
+      if (!isNaN(idx)) { focusPitchNode(idx); }
     }
   }
 }
@@ -1271,28 +1269,18 @@ function scheduleNextSlide() {
   const interval = BASE_INTERVAL / autoPlaySpeed;
   autoPlayTimerId = setTimeout(() => {
     const prevFocus = currentFocus;
+    // Try: expand into children (if hidden) and advance
     nextSlide();
-    // If focus didn't change (no more nodes to advance), stop
-    if (currentFocus === prevFocus && currentFocus === totalNodes - 1) {
-      // Check if there are still hidden descendants to reveal
-      const nodeEl = getFocusedNodeEl();
-      let hasHidden = false;
-      if (nodeEl) {
-        const children = getNodeChildrenContainer(nodeEl);
-        if (children) {
-          hasHidden = [...children.children].some(
-            c => c.classList.contains('pt-node') && c.classList.contains('unrevealed')
-          );
-        }
+    if (currentFocus === prevFocus) {
+      // No advance possible — are we at the true end?
+      // Check if there are ANY hidden children left in the entire tree
+      const anyHidden = document.querySelector('#pitchTree .pt-node.unrevealed');
+      if (!anyHidden && currentFocus >= totalNodes - 1) {
+        stopAutoPlay(); // Truly done: all nodes revealed and visited
+        return;
       }
-      if (!hasHidden) { stopAutoPlay(); return; }
     }
-    if (currentFocus !== prevFocus) {
-      scheduleNextSlide();
-    } else {
-      // Advance happened but focus same? Keep going
-      scheduleNextSlide();
-    }
+    scheduleNextSlide();
   }, interval);
 }
 
@@ -1491,7 +1479,10 @@ function toggleQuizMode() { quizMode ? exitQuiz() : startQuiz(); }
 
 function startQuiz() {
   quizPool = []; quizReviewed = new Set(); quizAnswerRevealed = false;
-  for (let i = 1; i < totalNodes; i++) quizPool.push(i);
+  // Only include non-leaf nodes (nodes with children to cover/reveal)
+  for (let i = 1; i < totalNodes; i++) {
+    if (slides[i].children.length > 0) quizPool.push(i);
+  }
   if (quizPool.length === 0) { alert('需要至少一个非根节点才能使用测验模式'); quizMode = false; return; }
   quizMode = true;
   // Bypass progressive reveal: reveal all nodes for quiz
@@ -1679,21 +1670,26 @@ document.addEventListener('keydown', (e) => {
   // Cover mode: no slide navigation
   if (coverMode) return;
 
-  // Tree navigation
+  // Tree navigation (manual → stop auto-play)
   if (e.key === 'ArrowRight') {
     e.preventDefault();
+    if (isAutoPlaying) stopAutoPlay();
     focusFirstChild();
   } else if (e.key === ' ' || e.key === 'PageDown') {
     e.preventDefault();
+    if (isAutoPlaying) stopAutoPlay();
     nextSlide();
   } else if (e.key === 'ArrowDown') {
     e.preventDefault();
+    if (isAutoPlaying) stopAutoPlay();
     focusNextSibling();
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
+    if (isAutoPlaying) stopAutoPlay();
     focusPrevSibling();
   } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
     e.preventDefault();
+    if (isAutoPlaying) stopAutoPlay();
     focusParent();
   }
 });
